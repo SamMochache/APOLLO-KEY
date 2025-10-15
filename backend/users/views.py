@@ -17,3 +17,30 @@ class MeView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+#RBAC Permissions
+from .permissions import IsAdmin, IsTeacher, IsStudent, IsParent, IsStaff
+from rest_framework.views import APIView
+
+
+
+class AdminOnlyView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        return Response({"message": "Welcome, Admin!"})
+
+
+class TeacherOnlyView(APIView):
+    permission_classes = [IsTeacher]
+
+    def get(self, request):
+        return Response({"message": "Welcome, Teacher!"})
+
+
+class StudentOnlyView(APIView):
+    permission_classes = [IsStudent]
+
+    def get(self, request):
+        return Response({"message": "Welcome, Student!"})
