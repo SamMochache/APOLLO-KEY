@@ -3,85 +3,84 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
-import Landing from "./pages/Landing"; // Landing page
+import Landing from "./pages/Landing";
+import Unauthorized from "./pages/Unauthorized";
 import { AuthContext } from "./context/AuthContext";
+import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute";
 
 function App() {
   const { user } = useContext(AuthContext);
 
-  // Protect routes: only authenticated users
-  const PrivateRoute = ({ children }) => {
-    return user ? children : <Navigate to="/login" replace />;
-  };
-
-  // Protect by role
-  const RoleRoute = ({ children, role }) => {
-    if (!user) return <Navigate to="/login" replace />;
-    return user.role === role ? children : <Navigate to="/dashboard" replace />;
-  };
-
   return (
+    <Router>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Protected Route: any authenticated user */}
+        {/* Generic Authenticated Dashboard */}
         <Route
           path="/dashboard"
           element={
-            <PrivateRoute>
+            <ProtectedRoute>
               <Dashboard />
-            </PrivateRoute>
+            </ProtectedRoute>
           }
         />
 
-        {/* Role-based Dashboards */}
+        {/* Role-Specific Dashboards */}
         <Route
           path="/admin"
           element={
-            <RoleRoute role="admin">
+            <RoleProtectedRoute role="admin">
               <Dashboard />
-            </RoleRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/teacher"
           element={
-            <RoleRoute role="teacher">
+            <RoleProtectedRoute role="teacher">
               <Dashboard />
-            </RoleRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/student"
           element={
-            <RoleRoute role="student">
+            <RoleProtectedRoute role="student">
               <Dashboard />
-            </RoleRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/parent"
           element={
-            <RoleRoute role="parent">
+            <RoleProtectedRoute role="parent">
               <Dashboard />
-            </RoleRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/staff"
           element={
-            <RoleRoute role="staff">
+            <RoleProtectedRoute role="staff">
               <Dashboard />
-            </RoleRoute>
+            </RoleProtectedRoute>
           }
         />
 
-        {/* Catch-all */}
-        <Route path="*" element={<Navigate to={user ? "/dashboard" : "/"} replace />} />
+        {/* Unauthorized page */}
+        <Route path="/unauthorized" element={<Unauthorized/>} />
+
+        {/* Catch-all route */}
+        <Route
+          path="*"
+          element={<Navigate to={user ? "/dashboard" : "/"} replace />}
+        />
       </Routes>
+    </Router>
   );
 }
 
