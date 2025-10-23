@@ -5,6 +5,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Landing from "./pages/Landing";
 import Unauthorized from "./pages/Unauthorized";
+import DashboardLayout from "./components/DashboardLayout"; // ✅ new layout
 import { AuthContext } from "./context/AuthContext";
 import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute";
 
@@ -19,60 +20,59 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Generic Authenticated Dashboard */}
+        {/* Protected Routes wrapped with DashboardLayout */}
         <Route
-          path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <DashboardLayout />
             </ProtectedRoute>
           }
-        />
-
-        {/* Role-Specific Dashboards */}
-        <Route
-          path="/admin"
-          element={
-            <RoleProtectedRoute role="admin">
-              <Dashboard />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/teacher"
-          element={
-            <RoleProtectedRoute role="teacher">
-              <Dashboard />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/student"
-          element={
-            <RoleProtectedRoute role="student">
-              <Dashboard />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/parent"
-          element={
-            <RoleProtectedRoute role="parent">
-              <Dashboard />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/staff"
-          element={
-            <RoleProtectedRoute role="staff">
-              <Dashboard />
-            </RoleProtectedRoute>
-          }
-        />
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/admin"
+            element={
+              <RoleProtectedRoute role="admin">
+                <Dashboard />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/teacher"
+            element={
+              <RoleProtectedRoute role="teacher">
+                <Dashboard />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/student"
+            element={
+              <RoleProtectedRoute role="student">
+                <Dashboard />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/parent"
+            element={
+              <RoleProtectedRoute role="parent">
+                <Dashboard />
+              </RoleProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff"
+            element={
+              <RoleProtectedRoute role="staff">
+                <Dashboard />
+              </RoleProtectedRoute>
+            }
+          />
+        </Route>
 
         {/* Unauthorized page */}
-        <Route path="/unauthorized" element={<Unauthorized/>} />
+        <Route path="/unauthorized" element={<Unauthorized />} />
 
         {/* Catch-all route */}
         <Route
