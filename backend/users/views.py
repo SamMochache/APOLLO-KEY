@@ -1,9 +1,11 @@
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
-
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
 from .serializers import RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer
 from .permissions import IsAdmin, IsTeacher, IsStudent, IsParent, IsStaff
 
@@ -24,6 +26,12 @@ class MeView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+    def get_serializer_context(self):
+        """Include request in context for building full image URLs"""
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
 
 # ✅ Custom Token View (uses our custom serializer)
@@ -51,3 +59,16 @@ class StudentOnlyView(APIView):
 
     def get(self, request):
         return Response({"message": "Welcome, Student!"})
+
+
+# ✅ Update Profile View (supports image upload + username change)
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def update_profile(request):
+    user = request.user
+    serializer = UserSerializer(user, data=request.data, partial=True, context={"request": request})
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

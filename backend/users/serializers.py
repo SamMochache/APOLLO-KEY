@@ -5,7 +5,6 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 User = get_user_model()
 
-
 # ✅ Registration Serializer
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
@@ -29,14 +28,27 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
-# ✅ User Serializer
+# ✅ User Serializer (supports read + write for profile updates)
 class UserSerializer(serializers.ModelSerializer):
+    profile_photo = serializers.ImageField(required=False)
+
     class Meta:
         model = User
-        fields = ("id", "email", "username", "first_name", "last_name", "role")
+        fields = ("id", "email", "username", "first_name", "last_name", "role", "profile_photo")
+        read_only_fields = ("email", "role")
+
+    def to_representation(self, instance):
+        """Return full URL for profile photo"""
+        rep = super().to_representation(instance)
+        request = self.context.get("request")
+        if instance.profile_photo and hasattr(instance.profile_photo, "url"):
+            rep["profile_photo"] = request.build_absolute_uri(instance.profile_photo.url)
+        else:
+            rep["profile_photo"] = None
+        return rep
 
 
-# ✅ Custom JWT Token Serializer (used for login)
+# ✅ Custom JWT Token Serializer (adds role + username to token)
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):

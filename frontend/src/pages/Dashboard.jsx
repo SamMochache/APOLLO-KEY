@@ -6,7 +6,6 @@ export default function Dashboard() {
 
   if (!user) return <p className="p-4 text-gray-600">Loading user...</p>;
 
-
   const sections = {
     admin: [
       { title: "Manage Users", description: "Add, edit or remove users", color: "bg-blue-500" },
@@ -35,7 +34,25 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-100 p-6">
       {/* Top bar */}
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Welcome, {user.username}</h1>
+        <div className="flex items-center space-x-4">
+          {user.profile_photo ? (
+            <img
+              src={user.profile_photo}
+              alt="Profile"
+              className="w-16 h-16 rounded-full object-cover border-2 border-blue-500"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-gray-300 flex items-center justify-center text-gray-700">
+              {user.username?.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <h1 className="text-3xl font-bold">Welcome, {user.username}</h1>
+            <p className="text-gray-700">{user.email}</p>
+            <p className="text-sm text-gray-600">Role: {user.role}</p>
+          </div>
+        </div>
+
         <button
           onClick={logout}
           className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded font-semibold transition transform hover:scale-105"
@@ -43,8 +60,6 @@ export default function Dashboard() {
           Logout
         </button>
       </div>
-
-      <p className="mb-6 text-gray-700">Role: {user.role}</p>
 
       {/* Dashboard cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">

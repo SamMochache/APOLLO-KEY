@@ -15,6 +15,16 @@ export const AuthProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(false);
 
+  // ✅ Fetch user profile from backend
+  const fetchUserProfile = async () => {
+    try {
+      const res = await api.get("/auth/me/");
+      setUser(res.data);
+    } catch (err) {
+      console.error("Failed to fetch profile:", err);
+    }
+  };
+
   // ✅ Register
   const register = async (email, username, password, password2, role) => {
     setLoading(true);
@@ -34,22 +44,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ Login (includes username & role)
+  // ✅ Login (fetch full profile immediately after)
   const login = async (email, password) => {
     setLoading(true);
     try {
       const res = await api.post("/auth/token/", { email, password });
-      const { access, refresh, username, role } = res.data;
+      const { access, refresh } = res.data;
 
       localStorage.setItem("access_token", access);
       localStorage.setItem("refresh_token", refresh);
 
-      // Prefer backend’s response first, fallback to JWT decode
-      const decoded = jwtDecode(access);
-      setUser({
-        username: username || decoded.username,
-        role: role || decoded.role,
-      });
+      await fetchUserProfile(); // fetch from backend
     } catch (err) {
       console.error("Login failed:", err);
       throw err.response?.data || err;
@@ -75,8 +80,8 @@ export const AuthProvider = ({ children }) => {
           const newAccess = res.data.access;
           localStorage.setItem("access_token", newAccess);
 
-          const decoded = jwtDecode(newAccess);
-          setUser(decoded);
+          // refresh user profile when token refreshes
+          await fetchUserProfile();
         } catch (err) {
           console.warn("Auto refresh failed:", err);
           logout();
@@ -87,6 +92,13 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, []);
 
+  // ✅ Fetch profile on first load if token exists
+  useEffect(() => {
+    if (localStorage.getItem("access_token")) {
+      fetchUserProfile();
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -95,6 +107,7 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         loading,
+        fetchUserProfile,
       }}
     >
       {children}
