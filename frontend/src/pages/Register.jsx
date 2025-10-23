@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 
 export default function Register() {
@@ -30,8 +30,6 @@ export default function Register() {
         formData.password2,
         formData.role
       );
-
-      // Redirect to login after successful registration
       navigate("/login");
     } catch (err) {
       setError(err.detail || "Registration failed");
@@ -41,13 +39,14 @@ export default function Register() {
   return (
     <div
       className="h-screen w-screen flex items-center justify-center bg-cover bg-center"
-      style={{ backgroundImage: `url('/public/laake.jpg')` }}
+      style={{ backgroundImage: `url('sunset1.jpeg')` }}
     >
-      <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-xl shadow-lg p-8 max-w-full sm:max-w-md w-full mx-4 sm:mx-0 animate-fadeIn">
+      <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-xl shadow-lg p-8 max-w-full sm:max-w-md w-full mx-4 animate-fadeIn">
         <h2 className="text-2xl font-bold mb-6 text-white text-center">
           Register
         </h2>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
+        {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
             type="email"
@@ -87,7 +86,7 @@ export default function Register() {
           />
           <select
             name="role"
-            className="p-3 rounded bg-white/50 placeholder-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+            className="p-3 rounded bg-white/50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
             value={formData.role}
             onChange={handleChange}
           >
@@ -97,6 +96,7 @@ export default function Register() {
             <option value="staff">Staff</option>
             <option value="admin">Admin</option>
           </select>
+
           <button
             type="submit"
             className="bg-green-500 hover:bg-green-600 text-white py-2 rounded font-bold transform hover:scale-105 transition"
@@ -104,6 +104,14 @@ export default function Register() {
             Register
           </button>
         </form>
+
+        {/* Link to Login */}
+        <div className="text-center mt-4 text-white">
+          Already have an account?{" "}
+          <Link to="/login" className="text-blue-300 hover:underline">
+            Login here
+          </Link>
+        </div>
       </div>
     </div>
   );

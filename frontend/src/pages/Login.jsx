@@ -1,5 +1,5 @@
 import React, { useState, useContext } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 
 export default function Login() {
@@ -15,7 +15,6 @@ export default function Login() {
     try {
       await login(email, password);
 
-      // Decode JWT to get user role
       const token = localStorage.getItem("access_token");
       let role = null;
       if (token) {
@@ -23,7 +22,6 @@ export default function Login() {
         role = decoded.role;
       }
 
-      // Redirect based on role
       switch (role) {
         case "admin":
           navigate("/admin");
@@ -53,9 +51,10 @@ export default function Login() {
       className="h-screen w-screen flex items-center justify-center bg-cover bg-center"
       style={{ backgroundImage: `url('sunset1.jpeg')` }}
     >
-      <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-xl shadow-lg p-8 max-w-full sm:max-w-sm w-full mx-4 sm:mx-0 animate-fadeIn">
+      <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-xl shadow-lg p-8 max-w-full sm:max-w-sm w-full mx-4 animate-fadeIn">
         <h2 className="text-2xl font-bold mb-6 text-white text-center">Login</h2>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
+        {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
             type="email"
@@ -80,6 +79,14 @@ export default function Login() {
             Login
           </button>
         </form>
+
+        {/* Link to Register */}
+        <div className="text-center mt-4 text-white">
+          Don’t have an account?{" "}
+          <Link to="/register" className="text-green-300 hover:underline">
+            Create one
+          </Link>
+        </div>
       </div>
     </div>
   );
