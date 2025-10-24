@@ -8,6 +8,8 @@ import Unauthorized from "./pages/Unauthorized";
 import DashboardLayout from "./components/DashboardLayout"; // ✅ new layout
 import { AuthContext } from "./context/AuthContext";
 import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute";
+import Profile from "./pages/Profile"; // ✅ Import the Profile page
+
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -29,6 +31,9 @@ function App() {
           }
         >
           <Route path="/dashboard" element={<Dashboard />} />
+          {/* ✅ Add profile route */}
+          <Route path="/profile" element={<Profile />} />
+          
           <Route
             path="/admin"
             element={

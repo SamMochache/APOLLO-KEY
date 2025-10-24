@@ -33,20 +33,44 @@ export default function Sidebar() {
   const roleLinks = links[user?.role] || [];
 
   return (
-    <aside className="bg-gray-800 text-white w-64 min-h-screen p-5">
-      <h2 className="text-lg font-semibold mb-6 capitalize">{user?.role} Panel</h2>
-      <ul className="space-y-3">
-        {roleLinks.map((link, idx) => (
-          <li key={idx}>
+    <aside className="bg-gray-800 text-white w-64 min-h-screen p-5 flex flex-col justify-between">
+      <div>
+        <h2 className="text-lg font-semibold mb-6 capitalize">{user?.role} Panel</h2>
+        <ul className="space-y-3">
+          {roleLinks.map((link, idx) => (
+            <li key={idx}>
+              <Link
+                to={link.to}
+                className="block p-2 rounded hover:bg-gray-700 transition"
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* ✅ Universal Section at Bottom */}
+      <div className="mt-8 border-t border-gray-700 pt-4">
+        <ul className="space-y-3">
+          <li>
             <Link
-              to={link.to}
-              className="block p-2 rounded hover:bg-gray-700 transition"
+              to="/profile"
+              className="block p-2 rounded hover:bg-gray-700 transition text-sm"
             >
-              {link.label}
+              👤 My Profile
             </Link>
           </li>
-        ))}
-      </ul>
+          <li>
+            <Link
+              to="/logout"
+              className="block p-2 rounded hover:bg-gray-700 transition text-sm text-red-400"
+            >
+              🚪 Logout
+            </Link>
+          </li>
+        </ul>
+      </div>
     </aside>
   );
 }

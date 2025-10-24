@@ -67,7 +67,13 @@ class StudentOnlyView(APIView):
 @parser_classes([MultiPartParser, FormParser])
 def update_profile(request):
     user = request.user
-    serializer = UserSerializer(user, data=request.data, partial=True, context={"request": request})
+    data = request.data.copy()
+
+    # ✅ Ensure file data is captured
+    if "profile_photo" in request.FILES:
+        data["profile_photo"] = request.FILES["profile_photo"]
+
+    serializer = UserSerializer(user, data=data, partial=True, context={"request": request})
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
