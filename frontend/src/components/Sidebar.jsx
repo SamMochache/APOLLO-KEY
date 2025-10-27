@@ -11,14 +11,23 @@ export default function Sidebar() {
       { to: "/admin", label: "Dashboard" },
       { to: "/users", label: "Manage Users" },
       { to: "/reports", label: "Reports" },
+      { to: "/classes", label: "Classes" },
+      { to: "/subjects", label: "Subjects" },
+      { to: "/timetable", label: "Timetable" },
     ],
     teacher: [
       { to: "/teacher", label: "My Classes" },
       { to: "/assignments", label: "Assignments" },
+      { to: "/classes", label: "Classes" },
+      { to: "/subjects", label: "Subjects" },
+      { to: "/timetable", label: "Timetable" },
     ],
     student: [
       { to: "/student", label: "My Courses" },
       { to: "/tasks", label: "Assignments" },
+      { to: "/classes", label: "Classes" },
+      { to: "/subjects", label: "Subjects" },
+      { to: "/timetable", label: "Timetable" },
     ],
     parent: [
       { to: "/parent", label: "Child Progress" },

@@ -11,6 +11,9 @@ import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute"
 import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import ClassDashboard from "./pages/ClassDashboard";
+import SubjectDashboard from "./pages/SubjectDashboard";
+import TimetableDashboard from "./pages/TimetableDashboard";
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -35,6 +38,9 @@ function App() {
         >
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/classes" element={<ClassDashboard />} />
+          <Route path="/subjects" element={<SubjectDashboard />} />
+          <Route path="/timetable" element={<TimetableDashboard />} />
 
           {/* 🎯 Role-based routes */}
           <Route
