@@ -36,7 +36,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
-    'users'
+    'users',
+    'academics',
 ]
 
 AUTH_USER_MODEL = 'users.User'
