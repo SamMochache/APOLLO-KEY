@@ -1,4 +1,5 @@
-from django.urls import path
+from django.urls import path, include, re_path
+from django.views.generic import TemplateView
 from . import views
 from .views import (
     RegisterView,
@@ -7,6 +8,8 @@ from .views import (
     TeacherOnlyView,
     StudentOnlyView,
     CustomTokenObtainPairView,
+    PasswordResetRequestView,
+    PasswordResetConfirmView,
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -19,4 +22,10 @@ urlpatterns = [
     path("admin-only/", AdminOnlyView.as_view(), name="admin_only"),
     path("teacher-only/", TeacherOnlyView.as_view(), name="teacher_only"),
     path("student-only/", StudentOnlyView.as_view(), name="student_only"),
+    path("password-reset/", PasswordResetRequestView.as_view(), name="password_reset_request"),
+    path("password-reset-confirm/", PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
+
+    path("", include("djoser.urls")),
+    path("", include("djoser.urls.jwt")),
+    re_path(r"^(?:.*)/?$", TemplateView.as_view(template_name="index.html")),
 ]

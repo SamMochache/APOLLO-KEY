@@ -80,6 +80,16 @@ export default function Login() {
           </button>
         </form>
 
+        {/* 🔗 Forgot Password */}
+        <div className="text-center mt-3">
+          <Link
+            to="/forgot-password"
+            className="text-sm text-yellow-200 hover:underline"
+          >
+            Forgot Password?
+          </Link>
+        </div>
+
         {/* Link to Register */}
         <div className="text-center mt-4 text-white">
           Don’t have an account?{" "}

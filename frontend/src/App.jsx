@@ -5,11 +5,12 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Landing from "./pages/Landing";
 import Unauthorized from "./pages/Unauthorized";
-import DashboardLayout from "./components/DashboardLayout"; // ✅ new layout
+import DashboardLayout from "./components/DashboardLayout";
 import { AuthContext } from "./context/AuthContext";
 import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute";
-import Profile from "./pages/Profile"; // ✅ Import the Profile page
-
+import Profile from "./pages/Profile";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -17,12 +18,14 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Public Routes */}
+        {/* 🌍 Public Routes */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-
-        {/* Protected Routes wrapped with DashboardLayout */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />  {/* ✅ ADD */}
+        <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />  {/* ✅ ADD */}
+  
+        {/* 🔒 Protected Routes */}
         <Route
           element={
             <ProtectedRoute>
@@ -31,9 +34,9 @@ function App() {
           }
         >
           <Route path="/dashboard" element={<Dashboard />} />
-          {/* ✅ Add profile route */}
           <Route path="/profile" element={<Profile />} />
-          
+
+          {/* 🎯 Role-based routes */}
           <Route
             path="/admin"
             element={
@@ -76,10 +79,10 @@ function App() {
           />
         </Route>
 
-        {/* Unauthorized page */}
+        {/* 🚫 Unauthorized */}
         <Route path="/unauthorized" element={<Unauthorized />} />
 
-        {/* Catch-all route */}
+        {/* 🧭 Catch-all */}
         <Route
           path="*"
           element={<Navigate to={user ? "/dashboard" : "/"} replace />}
