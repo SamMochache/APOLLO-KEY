@@ -13,6 +13,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ClassDashboard from "./pages/ClassDashboard";
 import SubjectDashboard from "./pages/SubjectDashboard";
+import TimetableBuilder from "./pages/TimetableBuilder";
 import TimetableDashboard from "./pages/TimetableDashboard";
 
 function App() {
@@ -25,8 +26,8 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />  {/* ✅ ADD */}
-        <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />  {/* ✅ ADD */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
   
         {/* 🔒 Protected Routes */}
         <Route
@@ -41,6 +42,7 @@ function App() {
           <Route path="/classes" element={<ClassDashboard />} />
           <Route path="/subjects" element={<SubjectDashboard />} />
           <Route path="/timetable" element={<TimetableDashboard />} />
+          <Route path="/timetable/builder" element={<TimetableBuilder />} />
 
           {/* 🎯 Role-based routes */}
           <Route
