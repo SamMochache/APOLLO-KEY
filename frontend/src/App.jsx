@@ -11,8 +11,7 @@ import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute"
 import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import ClassDashboard from "./pages/ClassDashboard";
-import SubjectDashboard from "./pages/SubjectDashboard";
+import AdminManagement from "./pages/AdminManagement";
 import TimetableBuilder from "./pages/TimetableBuilder";
 import TimetableDashboard from "./pages/TimetableDashboard";
 
@@ -39,12 +38,15 @@ function App() {
         >
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/classes" element={<ClassDashboard />} />
-          <Route path="/subjects" element={<SubjectDashboard />} />
+          
+          {/* 📚 Academic Management - Unified Route */}
+          <Route path="/academics" element={<AdminManagement />} />
+          
+          {/* 🕓 Timetable Routes */}
           <Route path="/timetable" element={<TimetableDashboard />} />
           <Route path="/timetable/builder" element={<TimetableBuilder />} />
 
-          {/* 🎯 Role-based routes */}
+          {/* 🎯 Role-based Dashboard Routes */}
           <Route
             path="/admin"
             element={
