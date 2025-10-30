@@ -48,19 +48,13 @@ export default function AttendanceRecorder() {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/academics/classes/${selectedClass}/`);
+      const res = await api.get(`/academics/attendance/students-by-class/?class_id=${selectedClass}`);
       const classData = res.data;
       
-      // Get student details
-      const studentPromises = classData.students?.map(studentId =>
-        api.get(`/auth/users/${studentId}/`).catch(() => null)
-      ) || [];
-      
-      const studentResults = await Promise.all(studentPromises);
-      const validStudents = studentResults
-        .filter(res => res !== null)
-        .map(res => res.data);
-
+      // ✅ Use 'students' (not user_set)
+      const validStudents = (classData || []).filter(
+        (student) => student.is_active !== false && student.role === "student"
+      );
       setStudents(validStudents);
       
       // Initialize attendance data

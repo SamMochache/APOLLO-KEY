@@ -1,8 +1,8 @@
 from django.db import models
-from django.conf import settings
 from django.core.exceptions import ValidationError
-
-User = settings.AUTH_USER_MODEL  # Reference to custom User model
+from django.contrib.auth import get_user_model
+User = get_user_model()
+# Reference to custom User model
 
 class Class(models.Model):
     """Represents an academic class or group of students."""

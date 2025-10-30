@@ -1,13 +1,11 @@
 # backend/academics/views.py
 from rest_framework import viewsets, permissions, status
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
-from users.models import User
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
 from .models import Class, Subject, Timetable, Attendance
 from .serializers import ClassSerializer, SubjectSerializer, TimetableSerializer, AttendanceSerializer
+from .models import User
 
 class ClassViewSet(viewsets.ModelViewSet):
     queryset = Class.objects.all().select_related("teacher").prefetch_related("students")
@@ -23,6 +21,58 @@ class ClassViewSet(viewsets.ModelViewSet):
         ).order_by('day', 'start_time')
         serializer = TimetableSerializer(timetable, many=True)
         return Response(serializer.data)
+    
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve class details + students"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+
+        # ✅ Fetch all students assigned to this class
+        students = User.objects.filter(class_assigned=instance, role="student")
+
+        # ✅ Return minimal student info
+        student_data = [
+            {
+                "id": s.id,
+                "username": s.username,
+                "full_name": f"{s.first_name} {s.last_name}".strip(),
+                "email": s.email,
+            }
+            for s in students
+        ]
+
+        # ✅ Include students in the response
+        data = serializer.data
+        data["students"] = student_data
+
+        return Response(data)
+    @action(detail=False, methods=["get"], url_path="students-by-class")
+    def students_by_class(self, request):
+        """
+        Return all students in a given class for attendance recording.
+        Example: /api/academics/attendance/students-by-class/?class_id=3
+        """
+        class_id = request.query_params.get("class_id")
+        if not class_id:
+            return Response({"error": "class_id is required"}, status=400)
+
+        try:
+            cls = Class.objects.get(id=class_id)
+        except Class.DoesNotExist:
+            return Response({"error": "Class not found"}, status=404)
+
+        # ✅ use the custom User model constants
+        students = cls.students.filter(role=User.STUDENT, is_active=True)
+        data = [
+            {
+                "id": s.id,
+                "username": s.username,
+                "full_name": s.get_full_name(),
+                "email": s.email,
+            }
+            for s in students
+        ]
+        return Response(data, status=200)
 
 
 class SubjectViewSet(viewsets.ModelViewSet):
@@ -304,3 +354,30 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             "total_students": len(stats),
             "student_statistics": stats,
         }, status=200)
+
+    @action(detail=False, methods=["get"], url_path="students-by-class")
+    def students_by_class(self, request):
+        """
+        Return all students in a given class for attendance recording.
+        Example: /api/attendance/students-by-class/?class_id=3
+        """
+        class_id = request.query_params.get("class_id")
+        if not class_id:
+            return Response({"error": "class_id is required"}, status=400)
+
+        try:
+            cls = Class.objects.get(id=class_id)
+        except Class.DoesNotExist:
+            return Response({"error": "Class not found"}, status=404)
+
+        students = cls.students.filter(role=User.STUDENT)
+        data = [
+            {
+                "id": s.id,
+                "username": s.username,
+                "full_name": s.get_full_name(),
+                "email": s.email,
+            }
+            for s in students
+        ]
+        return Response(data, status=200)

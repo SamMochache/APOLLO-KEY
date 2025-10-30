@@ -36,6 +36,9 @@ class ClassSerializer(serializers.ModelSerializer):
                 return f"{obj.teacher.first_name} {obj.teacher.last_name}"
             return obj.teacher.username
         return None
+    
+    def get_student_count(self, obj):
+        return obj.user_set.filter(role="student").count()
 
 
 class TimetableSerializer(serializers.ModelSerializer):
