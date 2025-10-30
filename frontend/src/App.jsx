@@ -16,6 +16,7 @@ import TimetableBuilder from "./pages/TimetableBuilder";
 import TimetableDashboard from "./pages/TimetableDashboard";
 import AttendanceDashboard from "./pages/AttendanceDashboard";
 import AttendanceRecorder from "./pages/AttendanceRecorder";
+import AttendanceRankings from "./pages/AttendanceRankings";  
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -46,7 +47,8 @@ function App() {
           <Route path="/academics" element={<AdminManagement />} />
           <Route path="/attendance" element={<AttendanceDashboard />} />
           <Route path="/attendance/record" element={<AttendanceRecorder />} />
-          
+          <Route path="/attendance/rankings" element={<AttendanceRankings />} /> {/* NEW ROUTE */}
+  
           {/* 🕓 Timetable Routes */}
           <Route path="/timetable" element={<TimetableDashboard />} />
           <Route path="/timetable/builder" element={<TimetableBuilder />} />
