@@ -1,10 +1,13 @@
 # backend/academics/views.py
 from rest_framework import viewsets, permissions, status
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from users.models import User
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Class, Subject, Timetable
-from .serializers import ClassSerializer, SubjectSerializer, TimetableSerializer
+from .models import Class, Subject, Timetable, Attendance
+from .serializers import ClassSerializer, SubjectSerializer, TimetableSerializer, AttendanceSerializer
 
 class ClassViewSet(viewsets.ModelViewSet):
     queryset = Class.objects.all().select_related("teacher").prefetch_related("students")
@@ -167,3 +170,137 @@ class TimetableViewSet(viewsets.ModelViewSet):
             'has_conflicts': len(conflicts) > 0,
             'conflicts': conflicts
         })
+
+from datetime import datetime
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.db.models import Q
+from .models import Attendance, Class, User
+from .serializers import AttendanceSerializer
+
+
+class AttendanceViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing attendance records."""
+    queryset = Attendance.objects.select_related("student", "class_assigned", "recorded_by")
+    serializer_class = AttendanceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """Filter attendance by user role and query params."""
+        user = self.request.user
+        queryset = super().get_queryset()
+
+        # Students only see their own records
+        if not user.is_staff and not user.is_superuser:
+            queryset = queryset.filter(student=user)
+
+        # Filtering options
+        class_id = self.request.query_params.get("class_id")
+        student_id = self.request.query_params.get("student_id")
+        date = self.request.query_params.get("date")
+
+        if class_id:
+            queryset = queryset.filter(class_assigned_id=class_id)
+        if student_id:
+            queryset = queryset.filter(student_id=student_id)
+        if date:
+            queryset = queryset.filter(date=date)
+
+        return queryset.order_by("-date")
+
+    @action(detail=False, methods=["get"])
+    def summary(self, request):
+        """Get attendance summary (e.g., total present/absent/late)."""
+        queryset = self.get_queryset()
+        summary = {
+            "total_records": queryset.count(),
+            "present": queryset.filter(status="present").count(),
+            "absent": queryset.filter(status="absent").count(),
+            "late": queryset.filter(status="late").count(),
+        }
+        return Response(summary, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="statistics")
+    def statistics(self, request):
+        """
+        Secure Role-Based Attendance Statistics
+        Automatically filters based on the logged-in user's role.
+        Optional filters:
+        - ?start_date=<YYYY-MM-DD>
+        - ?end_date=<YYYY-MM-DD>
+        """
+        user = request.user
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        attendance_qs = Attendance.objects.select_related("student", "class_assigned")
+
+        # 🎓 Role-based filtering
+        if user.is_superuser or user.is_admin():
+            # Admins see everything
+            pass
+        elif user.is_teacher():
+            # Teachers: show only attendance for their classes
+            teacher_classes = Class.objects.filter(teacher=user)
+            attendance_qs = attendance_qs.filter(class_assigned__in=teacher_classes)
+        elif user.role == User.STUDENT:
+            # Students: only their own records
+            attendance_qs = attendance_qs.filter(student=user)
+        elif user.role == User.PARENT:
+            # (Future) Parents: linked child's attendance
+            return Response({"detail": "Parent view not yet implemented."}, status=501)
+        elif user.role == User.STAFF:
+            # Staff: summary-only view (no individual stats)
+            total = attendance_qs.count()
+            present = attendance_qs.filter(status="present").count()
+            absent = attendance_qs.filter(status="absent").count()
+            rate = round((present / total) * 100, 2) if total > 0 else 0
+            return Response({
+                "summary": {
+                    "total_records": total,
+                    "present": present,
+                    "absent": absent,
+                    "attendance_rate": rate,
+                }
+            }, status=200)
+        else:
+            return Response({"detail": "Unauthorized role."}, status=403)
+
+        # 📅 Date filters
+        if start_date:
+            attendance_qs = attendance_qs.filter(date__gte=start_date)
+        if end_date:
+            attendance_qs = attendance_qs.filter(date__lte=end_date)
+
+        if not attendance_qs.exists():
+            return Response({"detail": "No attendance records found."}, status=404)
+
+        # 📊 Group stats by student
+        stats = []
+        students = attendance_qs.values("student").distinct()
+
+        for s in students:
+            student_id = s["student"]
+            student_records = attendance_qs.filter(student_id=student_id)
+            if not student_records.exists():
+                continue
+
+            total = student_records.count()
+            present = student_records.filter(status="present").count()
+            absent = student_records.filter(status="absent").count()
+            rate = round((present / total) * 100, 2)
+
+            stats.append({
+                "student_username": student_records.first().student.username,
+                "present": present,
+                "absent": absent,
+                "total": total,
+                "attendance_rate": rate,
+            })
+
+        return Response({
+            "role": user.role,
+            "total_students": len(stats),
+            "student_statistics": stats,
+        }, status=200)
