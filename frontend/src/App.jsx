@@ -14,6 +14,8 @@ import ResetPassword from "./pages/ResetPassword";
 import AdminManagement from "./pages/AdminManagement";
 import TimetableBuilder from "./pages/TimetableBuilder";
 import TimetableDashboard from "./pages/TimetableDashboard";
+import AttendanceDashboard from "./pages/AttendanceDashboard";
+import AttendanceRecorder from "./pages/AttendanceRecorder";
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -27,6 +29,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
+        
   
         {/* 🔒 Protected Routes */}
         <Route
@@ -41,6 +44,8 @@ function App() {
           
           {/* 📚 Academic Management - Unified Route */}
           <Route path="/academics" element={<AdminManagement />} />
+          <Route path="/attendance" element={<AttendanceDashboard />} />
+          <Route path="/attendance/record" element={<AttendanceRecorder />} />
           
           {/* 🕓 Timetable Routes */}
           <Route path="/timetable" element={<TimetableDashboard />} />

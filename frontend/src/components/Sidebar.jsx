@@ -2,16 +2,17 @@
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-import { 
-  LayoutDashboard, 
-  Users, 
-  BookOpen, 
-  Calendar, 
+import {
+  LayoutDashboard,
+  Users,
+  BookOpen,
+  Calendar,
   CalendarCog,
   ClipboardList,
   Settings,
   User,
-  LogOut
+  LogOut,
+  CheckSquare,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -26,6 +27,8 @@ export default function Sidebar() {
       { to: "/academics", label: "Classes & Subjects", icon: BookOpen },
       { to: "/timetable", label: "View Timetable", icon: Calendar },
       { to: "/timetable/builder", label: "Build Timetable", icon: CalendarCog },
+      { to: "/attendance", label: "Attendance Dashboard", icon: CheckSquare },
+      { to: "/attendance/record", label: "Record Attendance", icon: ClipboardList },
       { to: "/users", label: "Manage Users", icon: Users },
       { to: "/reports", label: "Reports", icon: ClipboardList },
     ],
@@ -34,21 +37,26 @@ export default function Sidebar() {
       { to: "/academics", label: "Classes & Subjects", icon: BookOpen },
       { to: "/timetable", label: "My Timetable", icon: Calendar },
       { to: "/timetable/builder", label: "Manage Schedule", icon: CalendarCog },
+      { to: "/attendance", label: "Attendance Dashboard", icon: CheckSquare },
+      { to: "/attendance/record", label: "Record Attendance", icon: ClipboardList },
     ],
     student: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
       { to: "/academics", label: "My Classes", icon: BookOpen },
       { to: "/timetable", label: "My Schedule", icon: Calendar },
+      { to: "/attendance", label: "My Attendance", icon: CheckSquare },
       { to: "/tasks", label: "Assignments", icon: ClipboardList },
     ],
     parent: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/academics", label: "Child's Classes", icon: BookOpen },
+      { to: "/attendance", label: "Child's Attendance", icon: CheckSquare },
       { to: "/updates", label: "School Updates", icon: ClipboardList },
     ],
     staff: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/academics", label: "Academic Info", icon: BookOpen },
+      { to: "/attendance", label: "Attendance Reports", icon: CheckSquare },
       { to: "/reports", label: "Reports", icon: ClipboardList },
     ],
   };
@@ -70,16 +78,17 @@ export default function Sidebar() {
             {roleLinks.map((link, idx) => {
               const Icon = link.icon;
               const active = isActive(link.to);
-              
+
               return (
                 <li key={idx}>
                   <Link
                     to={link.to}
                     className={`
                       flex items-center gap-3 p-3 rounded-lg transition-all duration-200
-                      ${active 
-                        ? 'bg-blue-600 text-white shadow-lg transform scale-105' 
-                        : 'hover:bg-gray-700 text-gray-300 hover:text-white'
+                      ${
+                        active
+                          ? "bg-blue-600 text-white shadow-lg transform scale-105"
+                          : "hover:bg-gray-700 text-gray-300 hover:text-white"
                       }
                     `}
                   >
@@ -99,16 +108,17 @@ export default function Sidebar() {
           to="/profile"
           className={`
             flex items-center gap-3 p-3 rounded-lg transition-all duration-200
-            ${isActive('/profile')
-              ? 'bg-blue-600 text-white shadow-lg' 
-              : 'hover:bg-gray-700 text-gray-300 hover:text-white'
+            ${
+              isActive("/profile")
+                ? "bg-blue-600 text-white shadow-lg"
+                : "hover:bg-gray-700 text-gray-300 hover:text-white"
             }
           `}
         >
           <User className="w-5 h-5" />
           <span className="font-medium">My Profile</span>
         </Link>
-        
+
         <button
           onClick={logout}
           className="w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 hover:bg-red-600 text-gray-300 hover:text-white"
