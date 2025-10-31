@@ -126,6 +126,12 @@ class Attendance(models.Model):
     class Meta:
         unique_together = ('student', 'class_assigned', 'date')
         ordering = ['-date']
+        indexes = [
+            models.Index(fields=['date', 'class_assigned']),
+            models.Index(fields=['student', 'date']),
+            models.Index(fields=['date', 'status']),
+        ]
+
 
     def __str__(self):
         return f"{self.student} - {self.class_assigned} - {self.date} ({self.status})"

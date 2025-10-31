@@ -6,6 +6,13 @@ from rest_framework.response import Response
 from django.db.models import Q
 from .models import Attendance, Class, User, Subject, Timetable
 from .serializers import AttendanceSerializer, ClassSerializer, SubjectSerializer, TimetableSerializer
+from django_filters.rest_framework import DjangoFilterBackend
+from .filters import AttendanceFilter
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
+from django.core.cache import cache
+
+
 
 class ClassViewSet(viewsets.ModelViewSet):
     queryset = Class.objects.all()
@@ -30,8 +37,19 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.select_related("student", "class_assigned", "recorded_by")
     serializer_class = AttendanceSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = AttendanceFilter
+
     def get_queryset(self):
+        """Filter attendance by user role."""
+        user = self.request.user
+        queryset = super().get_queryset()
+
+        if not user.is_staff and not user.is_superuser:
+            queryset = queryset.filter(student=user)
+
+        return queryset.order_by("-date")
+
         """Filter attendance by user role and query params."""
         user = self.request.user
         queryset = super().get_queryset()
@@ -63,8 +81,101 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         }
         return Response(summary, status=status.HTTP_200_OK)
 
+    @method_decorator(cache_page(60 * 5))  # Cache for 5 minutes
     @action(detail=False, methods=["get"], url_path="statistics")
     def statistics(self, request):
+        """Optimized attendance statistics (cached for 5 minutes)."""
+        cache_key = f"attendance_statistics_{request.user.id}_{request.get_full_path()}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data, status=status.HTTP_200_OK)
+        """Optimized attendance statistics (no N+1 queries)."""
+        from django.db.models import Count, Q
+
+        user = request.user
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        # Base queryset with related objects for efficiency
+        attendance_qs = Attendance.objects.select_related("student", "class_assigned")
+
+        # --- Role-based filtering ---
+        if user.is_superuser or getattr(user, "is_admin", lambda: False)():
+            pass
+        elif getattr(user, "is_teacher", lambda: False)():
+            teacher_classes = Class.objects.filter(teacher=user)
+            attendance_qs = attendance_qs.filter(class_assigned__in=teacher_classes)
+        elif user.role == User.STUDENT:
+            attendance_qs = attendance_qs.filter(student=user)
+        elif user.role == User.PARENT:
+            return Response(
+                {"detail": "Parent view not yet implemented."},
+                status=status.HTTP_501_NOT_IMPLEMENTED
+            )
+        elif user.role == User.STAFF:
+            total = attendance_qs.count()
+            present = attendance_qs.filter(status=Attendance.PRESENT).count()
+            rate = round((present / total) * 100, 2) if total > 0 else 0
+            return Response({
+                "summary": {
+                    "total_records": total,
+                    "present": present,
+                    "absent": attendance_qs.filter(status=Attendance.ABSENT).count(),
+                    "attendance_rate": rate
+                }
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {"detail": "Unauthorized role."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # --- Date filters ---
+        if start_date:
+            attendance_qs = attendance_qs.filter(date__gte=start_date)
+        if end_date:
+            attendance_qs = attendance_qs.filter(date__lte=end_date)
+
+        if not attendance_qs.exists():
+            return Response(
+                {"detail": "No attendance records found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # --- 🚀 Single optimized query for all student stats ---
+        stats_qs = (
+            attendance_qs
+            .values("student_id", "student__username", "student__first_name", "student__last_name")
+            .annotate(
+                total=Count("id"),
+                present=Count("id", filter=Q(status=Attendance.PRESENT)),
+                absent=Count("id", filter=Q(status=Attendance.ABSENT)),
+                late=Count("id", filter=Q(status=Attendance.LATE)),
+            )
+            .order_by("student__username")
+        )
+
+        # Compute attendance rate in Python (after aggregation)
+        stats = []
+        for s in stats_qs:
+            rate = round(((s["present"] + s["late"]) / s["total"]) * 100, 2) if s["total"] > 0 else 0
+            stats.append({
+                "student_id": s["student_id"],
+                "student_username": s["student__username"],
+                "student_name": f"{s['student__first_name']} {s['student__last_name']}".strip() or s["student__username"],
+                "total": s["total"],
+                "present": s["present"],
+                "absent": s["absent"],
+                "late": s["late"],
+                "attendance_rate": rate,
+            })
+
+        return Response({
+            "role": user.role,
+            "total_students": len(stats),
+            "student_statistics": stats
+        }, status=status.HTTP_200_OK)
+
         """Role-based attendance statistics with optional date filters."""
         user = request.user
         start_date = request.query_params.get("start_date")

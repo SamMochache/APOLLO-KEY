@@ -8,6 +8,8 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
+from django.core.validators import FileExtensionValidator
+from PIL import Image
 
 User = get_user_model()
 
@@ -33,9 +35,52 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.save()
         return user
 
+class MaxFileSizeValidator:
+    """Custom validator to limit file upload size."""
+    def __init__(self, max_mb=2):
+        self.max_mb = max_mb
+
+    def __call__(self, value):
+        limit = self.max_mb * 1024 * 1024
+        if value.size > limit:
+            raise serializers.ValidationError(f"File too large. Max size is {self.max_mb}MB.")
+
 
 # ✅ User Serializer (supports read + write for profile updates)
 class UserSerializer(serializers.ModelSerializer):
+    profile_photo = serializers.ImageField(
+        required=False,
+        allow_null=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=["jpg", "jpeg", "png", "gif"]),
+            MaxFileSizeValidator(max_mb=2),
+        ],
+    )
+
+    class Meta:
+        model = User
+        fields = ("id", "email", "username", "first_name", "last_name", "role", "profile_photo")
+        read_only_fields = ("email", "role")
+
+    def validate_profile_photo(self, value):
+        """Validate uploaded image integrity using Pillow."""
+        if value:
+            try:
+                img = Image.open(value)
+                img.verify()  # verifies file is a real image
+            except Exception:
+                raise serializers.ValidationError("Invalid or corrupted image file.")
+        return value
+
+    def to_representation(self, instance):
+        """Return full URL for profile photo."""
+        rep = super().to_representation(instance)
+        request = self.context.get("request")
+        if instance.profile_photo and hasattr(instance.profile_photo, "url"):
+            rep["profile_photo"] = request.build_absolute_uri(instance.profile_photo.url)
+        else:
+            rep["profile_photo"] = None
+        return rep
     profile_photo = serializers.ImageField(required=False)
 
     class Meta:

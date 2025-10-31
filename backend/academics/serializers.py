@@ -62,50 +62,76 @@ class TimetableSerializer(serializers.ModelSerializer):
         ]
     
     def validate(self, data):
-        """Check for scheduling conflicts"""
-        # Get the instance being updated (if any)
+        """Check for scheduling conflicts and enforce business rules."""
         instance = self.instance
-        
-        # Check class conflicts
-        class_query = Timetable.objects.filter(
-            class_assigned=data['class_assigned'],
-            day=data['day'],
-            start_time__lt=data['end_time'],
-            end_time__gt=data['start_time']
-        )
-        
-        if instance:
-            class_query = class_query.exclude(pk=instance.pk)
-        
-        if class_query.exists():
-            raise serializers.ValidationError({
-                'class_assigned': 'This class already has a session scheduled during this time slot.'
-            })
-        # In TimetableSerializer.validate()
-        if data['start_time'] >= data['end_time']:
-            raise serializers.ValidationError({
-                'end_time': 'End time must be after start time.'
-            })
-        
-        
-        
-        # Check teacher conflicts
-        if data.get('teacher'):
-            teacher_query = Timetable.objects.filter(
-                teacher=data['teacher'],
-                day=data['day'],
-                start_time__lt=data['end_time'],
-                end_time__gt=data['start_time']
-            )
-            
-            if instance:
-                teacher_query = teacher_query.exclude(pk=instance.pk)
-            
-            if teacher_query.exists():
+
+        # Resolve values from incoming data or existing instance (supports partial updates)
+        start_time = data.get("start_time") if "start_time" in data else (instance.start_time if instance else None)
+        end_time = data.get("end_time") if "end_time" in data else (instance.end_time if instance else None)
+        class_assigned = data.get("class_assigned") if "class_assigned" in data else (instance.class_assigned if instance else None)
+        teacher = data.get("teacher") if "teacher" in data else (instance.teacher if instance else None)
+        day = data.get("day") if "day" in data else (instance.day if instance else None)
+
+        # If start or end time or class/day missing, skip deep checks to allow partial updates
+        if start_time and end_time:
+            # Rule 1: Validate time order
+            if start_time >= end_time:
                 raise serializers.ValidationError({
-                    'teacher': 'This teacher is already scheduled for another class during this time.'
+                    "end_time": "End time must be later than start time."
                 })
-        
+
+        # Require class_assigned and day to evaluate schedule conflicts
+        if class_assigned and day and start_time and end_time:
+            # Rule 2: Check overlapping sessions for the same class
+            class_query = Timetable.objects.filter(
+                class_assigned=class_assigned,
+                day=day,
+                start_time__lt=end_time,
+                end_time__gt=start_time
+            )
+            if instance:
+                class_query = class_query.exclude(pk=instance.pk)
+            if class_query.exists():
+                raise serializers.ValidationError({
+                    "class_assigned": f"{class_assigned.name} already has a class scheduled during this time."
+                })
+
+            # Rule 3: Teacher conflict
+            if teacher:
+                teacher_query = Timetable.objects.filter(
+                    teacher=teacher,
+                    day=day,
+                    start_time__lt=end_time,
+                    end_time__gt=start_time
+                )
+                if instance:
+                    teacher_query = teacher_query.exclude(pk=instance.pk)
+                if teacher_query.exists():
+                    raise serializers.ValidationError({
+                        "teacher": f"{teacher.username} already has another session at this time on {day}."
+                    })
+
+            # Rule 4: Max sessions per day (per class)
+            MAX_SESSIONS_PER_DAY = 6
+            sessions_today = Timetable.objects.filter(
+                class_assigned=class_assigned, day=day
+            ).exclude(pk=instance.pk if instance else None).count()
+            if sessions_today >= MAX_SESSIONS_PER_DAY:
+                raise serializers.ValidationError({
+                    "limit": f"{class_assigned.name} has reached the maximum of {MAX_SESSIONS_PER_DAY} sessions for {day}."
+                })
+
+            # Rule 5: Teacher workload limit (optional)
+            MAX_TEACHER_SESSIONS = 8
+            if teacher:
+                teacher_sessions = Timetable.objects.filter(
+                    teacher=teacher, day=day
+                ).exclude(pk=instance.pk if instance else None).count()
+                if teacher_sessions >= MAX_TEACHER_SESSIONS:
+                    raise serializers.ValidationError({
+                        "teacher_load": f"{teacher.username} has reached their daily teaching limit ({MAX_TEACHER_SESSIONS} sessions)."
+                    })
+
         return data
     
     def get_teacher_name(self, obj):
