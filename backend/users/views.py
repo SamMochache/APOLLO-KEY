@@ -8,6 +8,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .serializers import RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 from .permissions import IsAdmin, IsTeacher, IsStudent, IsParent, IsStaff
+from academics.throttles import LoginRateThrottle
 
 User = get_user_model()
 
@@ -37,6 +38,7 @@ class MeView(generics.RetrieveAPIView):
 # ✅ Custom Token View (uses our custom serializer)
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+    throttle_classes = [LoginRateThrottle]
 
 
 # ✅ Role-Based Views

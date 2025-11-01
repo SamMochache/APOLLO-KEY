@@ -50,6 +50,20 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 25,
     
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+
+    # ✅ ADD THROTTLING
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',      # Anonymous users: 100 requests per hour
+        'user': '1000/hour',     # Authenticated users: 1000 requests per hour
+        'burst': '20/minute',    # Burst protection: 20 per minute
+        'sustained': '500/day',  # Daily limit
+        'login': '5/hour',     # Login attempts: 5 per hour
+    },
+    'EXCEPTION_HANDLER': 'config.exception_handlers.custom_exception_handler',
 }
 
 # Simple JWT settings (tune as needed)
@@ -70,8 +84,22 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'academics.middleware.ThrottleLoggingMiddleware',
 ]
+# ============================================
+# TEST RATE LIMITING
+# ============================================
+"""
+# Test with curl:
+for i in {1..25}; do
+  curl -X GET http://localhost:8000/api/academics/attendance/ \
+       -H "Authorization: Bearer YOUR_TOKEN"
+  echo "Request $i"
+  sleep 0.1
+done
 
+# Should see 429 errors after 20 requests (burst limit)
+"""
 # -------------------------
 # CORS - secure configuration
 # -------------------------
@@ -199,3 +227,117 @@ CACHES = {
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"
 """
+
+# Create logs directory if it doesn't exist
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {asctime} {message}',
+            'style': '{',
+        },
+        'json': {
+            'format': '{"time": "%(asctime)s", "level": "%(levelname)s", "module": "%(module)s", "message": "%(message)s"}',
+        },
+    },
+    
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+    },
+    
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file_general': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'general.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'file_error': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'error.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'file_attendance': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'attendance.log',
+            'maxBytes': 1024 * 1024 * 5,  # 5 MB
+            'backupCount': 3,
+            'formatter': 'json',
+        },
+        'file_auth': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'auth.log',
+            'maxBytes': 1024 * 1024 * 5,  # 5 MB
+            'backupCount': 3,
+            'formatter': 'json',
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'class': 'django.utils.log.AdminEmailHandler',
+            'filters': ['require_debug_false'],
+            'formatter': 'verbose',
+        },
+    },
+    
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file_general'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['file_error', 'mail_admins'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['file_general'],
+            'level': 'WARNING',  # Set to DEBUG to log all SQL queries
+            'propagate': False,
+        },
+        'academics': {
+            'handlers': ['console', 'file_attendance'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'users': {
+            'handlers': ['console', 'file_auth'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+    
+    'root': {
+        'handlers': ['console', 'file_general'],
+        'level': 'INFO',
+    },
+}
+
+

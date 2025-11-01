@@ -1,6 +1,8 @@
+// frontend/src/api/axios.js - FIXED with environment variables
 import axios from "axios";
 
-const BASE_URL = "http://127.0.0.1:8000/api";
+// ✅ FIXED: Use environment variable with fallback
+const BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -47,6 +49,18 @@ api.interceptors.response.use(
         localStorage.removeItem("refresh_token");
         window.location.href = "/login";
       }
+    }
+    if (error.response && error.response.status === 429) {
+      const retryAfter = error.response.headers['retry-after'];
+      console.warn(`Rate limited. Retry after: ${retryAfter} seconds`);
+      
+      // Show user-friendly message
+      // toast.error(`Too many requests. Please wait ${retryAfter} seconds.`);
+      
+      return Promise.reject({
+        ...error,
+        message: `Rate limit exceeded. Please try again in ${retryAfter} seconds.`
+      });
     }
 
     return Promise.reject(error);

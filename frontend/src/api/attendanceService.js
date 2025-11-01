@@ -1,24 +1,8 @@
-// frontend/src/api/attendanceApi.js
-import {
-  getAttendanceRecords,
-  getAttendanceRecord,
-  createAttendanceRecord,
-  updateAttendanceRecord,
-  deleteAttendanceRecord,
-  getAttendanceSummary,
-  getAttendanceStatistics,
-  getAttendanceRankings,
-  getStudentRank,
-  bulkCreateAttendance,
-  bulkUpdateAttendance,
-  exportRankingsCSV,
-} from "./attendanceService";
-
-// frontend/src/api/attendanceService.js
+// frontend/src/api/attendanceService.js - COMPLETE UPDATED VERSION
 import api from "./axios";
 
 // Base URL for attendance endpoints
-const BASE_URL = "/attendance";
+const BASE_URL = "/academics/attendance";
 
 // ---------- CRUD ----------
 export async function getAttendanceRecords(params = {}) {
@@ -63,20 +47,28 @@ export async function getAttendanceRankings(params = {}) {
 }
 
 export async function getStudentRank(studentId, classId = null) {
-  const response = await api.get(`${BASE_URL}/student-rank/${studentId}/`, {
-    params: classId ? { class_id: classId } : {},
+  const response = await api.get(`${BASE_URL}/student-rank/`, {
+    params: { 
+      student_id: studentId,
+      ...(classId && { class_id: classId })
+    },
   });
   return response.data;
 }
 
-// ---------- Bulk Operations ----------
+// ---------- Bulk Operations (FIXED) ----------
 export async function bulkCreateAttendance(records) {
-  const response = await api.post(`${BASE_URL}/bulk_create/`, records);
+  const response = await api.post(`${BASE_URL}/bulk-create/`, { records });
   return response.data;
 }
 
 export async function bulkUpdateAttendance(records) {
-  const response = await api.put(`${BASE_URL}/bulk_update/`, records);
+  const response = await api.put(`${BASE_URL}/bulk-update/`, { records });
+  return response.data;
+}
+
+export async function bulkDeleteAttendance(ids) {
+  const response = await api.delete(`${BASE_URL}/bulk-delete/`, { data: { ids } });
   return response.data;
 }
 
@@ -89,6 +81,7 @@ export async function exportRankingsCSV(params = {}) {
   return response.data;
 }
 
+// ---------- Service Class with Caching ----------
 class AttendanceService {
   constructor() {
     this.cache = new Map();
@@ -96,7 +89,6 @@ class AttendanceService {
   }
 
   // ---------- Utility Helpers ----------
-
   _getCacheKey(endpoint, params = {}) {
     return `${endpoint}?${new URLSearchParams(params).toString()}`;
   }
@@ -131,13 +123,13 @@ class AttendanceService {
       const message =
         error.response?.data?.detail ||
         error.response?.data?.error ||
+        error.message ||
         "An unexpected error occurred.";
       throw new Error(message);
     }
   }
 
   // ---------- API Wrappers ----------
-
   async fetchRecords(params = {}, useCache = true) {
     const key = this._getCacheKey("records", params);
     return this._handleRequest(() => getAttendanceRecords(params), key, useCache);
@@ -178,7 +170,11 @@ class AttendanceService {
   }
 
   async studentRank(studentId, classId = null) {
-    return this._handleRequest(() => getStudentRank(studentId, classId), `rank_${studentId}_${classId || "all"}`, true);
+    return this._handleRequest(
+      () => getStudentRank(studentId, classId), 
+      `rank_${studentId}_${classId || "all"}`, 
+      true
+    );
   }
 
   async bulkCreate(records) {
@@ -191,8 +187,18 @@ class AttendanceService {
     return this._handleRequest(() => bulkUpdateAttendance(records), "bulk_update", false);
   }
 
+  async bulkDelete(ids) {
+    this.cache.clear();
+    return this._handleRequest(() => bulkDeleteAttendance(ids), "bulk_delete", false);
+  }
+
   async exportRankings(params = {}) {
     return exportRankingsCSV(params);
+  }
+
+  // Clear cache manually
+  clearCache() {
+    this.cache.clear();
   }
 }
 

@@ -1,9 +1,7 @@
-# backend/academics/serializers.py - REPLACE ENTIRE FILE
-
-from rest_framework import serializers, permissions, viewsets
-from rest_framework.decorators import action
-from rest_framework.response import Response
+# backend/academics/serializers.py - CLEANED (ONLY SERIALIZERS)
+from rest_framework import serializers
 from .models import Class, Subject, Timetable, Attendance
+
 
 class SubjectSerializer(serializers.ModelSerializer):
     teacher_name = serializers.SerializerMethodField()
@@ -15,9 +13,7 @@ class SubjectSerializer(serializers.ModelSerializer):
     def get_teacher_name(self, obj):
         """Get full name or username of teacher"""
         if obj.teacher:
-            if obj.teacher.first_name and obj.teacher.last_name:
-                return f"{obj.teacher.first_name} {obj.teacher.last_name}"
-            return obj.teacher.username
+            return obj.teacher.get_full_name()
         return None
 
 
@@ -32,13 +28,8 @@ class ClassSerializer(serializers.ModelSerializer):
     def get_teacher_name(self, obj):
         """Get full name or username of teacher"""
         if obj.teacher:
-            if obj.teacher.first_name and obj.teacher.last_name:
-                return f"{obj.teacher.first_name} {obj.teacher.last_name}"
-            return obj.teacher.username
+            return obj.teacher.get_full_name()
         return None
-    
-    def get_student_count(self, obj):
-        return obj.user_set.filter(role="student").count()
 
 
 class TimetableSerializer(serializers.ModelSerializer):
@@ -137,10 +128,9 @@ class TimetableSerializer(serializers.ModelSerializer):
     def get_teacher_name(self, obj):
         """Get full name or username of teacher"""
         if obj.teacher:
-            if obj.teacher.first_name and obj.teacher.last_name:
-                return f"{obj.teacher.first_name} {obj.teacher.last_name}"
-            return obj.teacher.username
+            return obj.teacher.get_full_name()
         return None
+
     
 class AttendanceSerializer(serializers.ModelSerializer):
     """Handles student attendance records."""
@@ -167,16 +157,12 @@ class AttendanceSerializer(serializers.ModelSerializer):
 
     def get_student_name(self, obj):
         if obj.student:
-            if obj.student.first_name and obj.student.last_name:
-                return f"{obj.student.first_name} {obj.student.last_name}"
-            return obj.student.username
+            return obj.student.get_full_name()
         return None
 
     def get_recorded_by_name(self, obj):
         if obj.recorded_by:
-            if obj.recorded_by.first_name and obj.recorded_by.last_name:
-                return f"{obj.recorded_by.first_name} {obj.recorded_by.last_name}"
-            return obj.recorded_by.username
+            return obj.recorded_by.get_full_name()
         return None
 
     def validate(self, data):
@@ -203,45 +189,3 @@ class AttendanceSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         validated_data["recorded_by"] = user
         return super().create(validated_data)
-
-# backend/academics/views.py
-class AttendanceViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing attendance records."""
-    queryset = Attendance.objects.select_related("student", "class_assigned", "recorded_by")
-    serializer_class = AttendanceSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        """Filter attendance by user role and query params."""
-        user = self.request.user
-        queryset = super().get_queryset()
-
-        # Students only see their own records
-        if not user.is_staff and not user.is_superuser:
-            queryset = queryset.filter(student=user)
-
-        # Filtering options
-        class_id = self.request.query_params.get("class_id")
-        student_id = self.request.query_params.get("student_id")
-        date = self.request.query_params.get("date")
-
-        if class_id:
-            queryset = queryset.filter(class_assigned_id=class_id)
-        if student_id:
-            queryset = queryset.filter(student_id=student_id)
-        if date:
-            queryset = queryset.filter(date=date)
-
-        return queryset.order_by("-date")
-
-    @action(detail=False, methods=["get"])
-    def summary(self, request):
-        """Get attendance summary (e.g., total present/absent)."""
-        queryset = self.get_queryset()
-        summary = {
-            "total_records": queryset.count(),
-            "present": queryset.filter(status="present").count(),
-            "absent": queryset.filter(status="absent").count(),
-            "late": queryset.filter(status="late").count(),
-        }
-        return Response(summary)

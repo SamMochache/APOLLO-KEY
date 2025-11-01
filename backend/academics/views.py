@@ -1,9 +1,9 @@
-# backend/academics/views.py
+# backend/academics/views.py - FIXED AttendanceViewSet only
 from datetime import datetime
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q
+from django.db.models import Q, Count
 from .models import Attendance, Class, User, Subject, Timetable
 from .serializers import AttendanceSerializer, ClassSerializer, SubjectSerializer, TimetableSerializer
 from django_filters.rest_framework import DjangoFilterBackend
@@ -11,7 +11,8 @@ from .filters import AttendanceFilter
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
-
+from django.db import transaction
+from .throttles import UserRateThrottle, BurstRateThrottle, BulkOperationThrottle
 
 
 class ClassViewSet(viewsets.ModelViewSet):
@@ -40,38 +41,23 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = AttendanceFilter
 
+    # ✅ ADD DEFAULT THROTTLING
+    throttle_classes = [UserRateThrottle, BurstRateThrottle]
+
     def get_queryset(self):
         """Filter attendance by user role."""
         user = self.request.user
         queryset = super().get_queryset()
 
-        if not user.is_staff and not user.is_superuser:
+        # Students only see their own records
+        if not user.is_staff and not user.is_superuser and user.role == User.STUDENT:
             queryset = queryset.filter(student=user)
-
-        return queryset.order_by("-date")
-
-        """Filter attendance by user role and query params."""
-        user = self.request.user
-        queryset = super().get_queryset()
-
-        if not user.is_staff and not user.is_superuser:
-            queryset = queryset.filter(student=user)
-
-        class_id = self.request.query_params.get("class_id")
-        student_id = self.request.query_params.get("student_id")
-        date = self.request.query_params.get("date")
-
-        if class_id:
-            queryset = queryset.filter(class_assigned_id=class_id)
-        if student_id:
-            queryset = queryset.filter(student_id=student_id)
-        if date:
-            queryset = queryset.filter(date=date)
 
         return queryset.order_by("-date")
 
     @action(detail=False, methods=["get"])
     def summary(self, request):
+        """Get attendance summary (total present/absent/late)."""
         queryset = self.get_queryset()
         summary = {
             "total_records": queryset.count(),
@@ -89,8 +75,6 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         cached_data = cache.get(cache_key)
         if cached_data:
             return Response(cached_data, status=status.HTTP_200_OK)
-        """Optimized attendance statistics (no N+1 queries)."""
-        from django.db.models import Count, Q
 
         user = request.user
         start_date = request.query_params.get("start_date")
@@ -100,9 +84,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         attendance_qs = Attendance.objects.select_related("student", "class_assigned")
 
         # --- Role-based filtering ---
-        if user.is_superuser or getattr(user, "is_admin", lambda: False)():
-            pass
-        elif getattr(user, "is_teacher", lambda: False)():
+        if user.is_superuser or user.role == User.ADMIN:
+            pass  # See all
+        elif user.role == User.TEACHER:
             teacher_classes = Class.objects.filter(teacher=user)
             attendance_qs = attendance_qs.filter(class_assigned__in=teacher_classes)
         elif user.role == User.STUDENT:
@@ -170,79 +154,16 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 "attendance_rate": rate,
             })
 
-        return Response({
+        result = {
             "role": user.role,
             "total_students": len(stats),
             "student_statistics": stats
-        }, status=status.HTTP_200_OK)
+        }
 
-        """Role-based attendance statistics with optional date filters."""
-        user = request.user
-        start_date = request.query_params.get("start_date")
-        end_date = request.query_params.get("end_date")
-
-        attendance_qs = Attendance.objects.select_related("student", "class_assigned")
-
-        # Role-based filtering
-        if user.is_superuser or getattr(user, "is_admin", lambda: False)():
-            pass
-        elif getattr(user, "is_teacher", lambda: False)():
-            teacher_classes = Class.objects.filter(teacher=user)
-            attendance_qs = attendance_qs.filter(class_assigned__in=teacher_classes)
-        elif user.role == User.STUDENT:
-            attendance_qs = attendance_qs.filter(student=user)
-        elif user.role == User.PARENT:
-            return Response({"detail": "Parent view not yet implemented."}, status=status.HTTP_501_NOT_IMPLEMENTED)
-        elif user.role == User.STAFF:
-            total = attendance_qs.count()
-            present = attendance_qs.filter(status=Attendance.PRESENT).count()
-            rate = round((present / total) * 100, 2) if total > 0 else 0
-            return Response({
-                "summary": {
-                    "total_records": total,
-                    "present": present,
-                    "absent": attendance_qs.filter(status=Attendance.ABSENT).count(),
-                    "attendance_rate": rate
-                }
-            }, status=status.HTTP_200_OK)
-        else:
-            return Response({"detail": "Unauthorized role."}, status=status.HTTP_403_FORBIDDEN)
-
-        # Date filters
-        if start_date:
-            attendance_qs = attendance_qs.filter(date__gte=start_date)
-        if end_date:
-            attendance_qs = attendance_qs.filter(date__lte=end_date)
-
-        if not attendance_qs.exists():
-            return Response({"detail": "No attendance records found."}, status=status.HTTP_404_NOT_FOUND)
-
-        # Stats by student
-        stats = []
-        student_ids = attendance_qs.values_list('student_id', flat=True).distinct()
-        for student_id in student_ids:
-            records = attendance_qs.filter(student_id=student_id)
-            total = records.count()
-            present = records.filter(status=Attendance.PRESENT).count()
-            absent = records.filter(status=Attendance.ABSENT).count()
-            late = records.filter(status=Attendance.LATE).count()
-            rate = round(((present + late) / total) * 100, 2) if total > 0 else 0
-            stats.append({
-                "student_id": student_id,
-                "student_username": records.first().student.username,
-                "student_name": records.first().student.get_full_name() or records.first().student.username,
-                "total": total,
-                "present": present,
-                "absent": absent,
-                "late": late,
-                "attendance_rate": rate
-            })
-
-        return Response({
-            "role": user.role,
-            "total_students": len(stats),
-            "student_statistics": stats
-        }, status=status.HTTP_200_OK)
+        # Cache the result
+        cache.set(cache_key, result, 60 * 5)
+        
+        return Response(result, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="students-by-class")
     def students_by_class(self, request):
@@ -284,7 +205,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         attendance_qs = Attendance.objects.select_related("student", "class_assigned")
 
         # Role-based filtering
-        if user.is_teacher():
+        if user.role == User.TEACHER:
             teacher_classes = Class.objects.filter(teacher=user)
             attendance_qs = attendance_qs.filter(class_assigned__in=teacher_classes)
         elif user.role == User.STUDENT:
@@ -330,13 +251,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             rankings.append({
                 "student_id": student.id,
                 "student_username": student.username,
-                "student_name": student.get_full_name() or student.username,
+                "student_name": student.get_full_name(),
                 "total_records": total,
                 "present": present,
                 "absent": absent,
                 "late": late,
                 "attendance_rate": rate,
-                "email": student.email if (user.is_admin() or user.is_teacher()) else None
+                "email": student.email if (user.role == User.ADMIN or user.role == User.TEACHER) else None
             })
 
         rankings.sort(key=lambda x: x['attendance_rate'], reverse=True)
@@ -377,7 +298,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         attendance_qs = Attendance.objects.select_related("student", "class_assigned")
         if class_id:
             attendance_qs = attendance_qs.filter(class_assigned_id=class_id)
-        if user.is_teacher() and not (user.is_superuser or user.is_admin()):
+        if user.role == User.TEACHER and not (user.is_superuser or user.role == User.ADMIN):
             teacher_classes = Class.objects.filter(teacher=user)
             attendance_qs = attendance_qs.filter(class_assigned__in=teacher_classes)
 
@@ -403,7 +324,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         if rank is None:
             return Response({"detail": "No attendance records found for this student",
-                             "student_name": target_student.get_full_name() or target_student.username},
+                             "student_name": target_student.get_full_name()},
                             status=status.HTTP_404_NOT_FOUND)
 
         total_students = len(all_rankings)
@@ -422,7 +343,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         return Response({
             "student_id": target_student.id,
-            "student_name": target_student.get_full_name() or target_student.username,
+            "student_name": target_student.get_full_name(),
             "rank": rank,
             "total_students": total_students,
             "percentile": percentile,
@@ -430,3 +351,193 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             "category": category,
             "class_filter": class_id
         }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="bulk-create")
+    def bulk_create(self, request):
+        """
+        Bulk create attendance records.
+        Expected format: {"records": [{student: 1, class_assigned: 1, date: "2024-01-01", status: "present"}, ...]
+        """
+        # ✅ OVERRIDE THROTTLING FOR THIS SPECIFIC ENDPOINT
+        self.throttle_classes = [BulkOperationThrottle]
+
+        records = request.data.get("records", [])
+
+        # Limit bulk size
+        MAX_BULK_SIZE = 100
+        if len(records) > MAX_BULK_SIZE:
+            return Response(
+                {"error": f"Cannot create more than {MAX_BULK_SIZE} records at once"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not records:
+            return Response(
+                {"error": "No records provided"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not isinstance(records, list):
+            return Response(
+                {"error": "Records must be a list"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate all records first
+        serializer = AttendanceSerializer(
+            data=records, 
+            many=True, 
+            context={'request': request}
+        )
+        
+        if serializer.is_valid():
+            try:
+                with transaction.atomic():
+                    created_records = serializer.save()
+                    return Response(
+                        {
+                            "success": True,
+                            "message": f"{len(created_records)} attendance records created",
+                            "data": AttendanceSerializer(created_records, many=True).data
+                        },
+                        status=status.HTTP_201_CREATED
+                    )
+            except Exception as e:
+                return Response(
+                    {"error": f"Failed to create records: {str(e)}"}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        
+        return Response(
+            {
+                "error": "Validation failed",
+                "details": serializer.errors
+            }, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    @action(detail=False, methods=["put"], url_path="bulk-update")
+    def bulk_update(self, request):
+        """
+        Bulk update attendance records.
+        Expected format: {"records": [{id: 1, status: "late", notes: "..."}, ...]}
+        """
+
+        self.throttle_classes = [BulkOperationThrottle]
+
+        records = request.data.get("records", [])
+
+        MAX_BULK_SIZE = 100
+        if len(records) > MAX_BULK_SIZE:
+            return Response(
+                {"error": f"Cannot update more than {MAX_BULK_SIZE} records at once"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        
+        if not records:
+            return Response(
+                {"error": "No records provided"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not isinstance(records, list):
+            return Response(
+                {"error": "Records must be a list"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        updated = []
+        errors = []
+        
+        try:
+            with transaction.atomic():
+                for record_data in records:
+                    record_id = record_data.get('id')
+                    
+                    if not record_id:
+                        errors.append({"record": record_data, "error": "Missing 'id' field"})
+                        continue
+                    
+                    try:
+                        instance = Attendance.objects.get(id=record_id)
+                        serializer = AttendanceSerializer(
+                            instance, 
+                            data=record_data, 
+                            partial=True,
+                            context={'request': request}
+                        )
+                        
+                        if serializer.is_valid():
+                            serializer.save()
+                            updated.append(serializer.data)
+                        else:
+                            errors.append({
+                                "record_id": record_id, 
+                                "errors": serializer.errors
+                            })
+                            
+                    except Attendance.DoesNotExist:
+                        errors.append({
+                            "record_id": record_id, 
+                            "error": "Attendance record not found"
+                        })
+        
+        except Exception as e:
+            return Response(
+                {"error": f"Bulk update failed: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        response_data = {
+            "success": len(updated) > 0,
+            "updated": len(updated),
+            "data": updated
+        }
+        
+        if errors:
+            response_data["errors"] = errors
+            response_data["failed"] = len(errors)
+        
+        status_code = status.HTTP_200_OK if len(updated) > 0 else status.HTTP_400_BAD_REQUEST
+        
+        return Response(response_data, status=status_code)
+
+    @action(detail=False, methods=["delete"], url_path="bulk-delete")
+    def bulk_delete(self, request):
+        """
+        Bulk delete attendance records.
+        Expected format: {"ids": [1, 2, 3, ...]}
+        """
+        ids = request.data.get("ids", [])
+        
+        if not ids:
+            return Response(
+                {"error": "No IDs provided"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not isinstance(ids, list):
+            return Response(
+                {"error": "IDs must be a list"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with transaction.atomic():
+                deleted_count, _ = Attendance.objects.filter(id__in=ids).delete()
+                
+                return Response(
+                    {
+                        "success": True,
+                        "message": f"{deleted_count} records deleted",
+                        "deleted_count": deleted_count
+                    },
+                    status=status.HTTP_200_OK
+                )
+        
+        except Exception as e:
+            return Response(
+                {"error": f"Bulk delete failed: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

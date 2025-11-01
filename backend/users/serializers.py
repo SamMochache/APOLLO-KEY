@@ -1,3 +1,4 @@
+# backend/users/serializers.py - FIXED (No duplicates)
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -12,6 +13,7 @@ from django.core.validators import FileExtensionValidator
 from PIL import Image
 
 User = get_user_model()
+
 
 # ✅ Registration Serializer
 class RegisterSerializer(serializers.ModelSerializer):
@@ -34,6 +36,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
 
 class MaxFileSizeValidator:
     """Custom validator to limit file upload size."""
@@ -81,22 +84,6 @@ class UserSerializer(serializers.ModelSerializer):
         else:
             rep["profile_photo"] = None
         return rep
-    profile_photo = serializers.ImageField(required=False)
-
-    class Meta:
-        model = User
-        fields = ("id", "email", "username", "first_name", "last_name", "role", "profile_photo")
-        read_only_fields = ("email", "role")
-
-    def to_representation(self, instance):
-        """Return full URL for profile photo"""
-        rep = super().to_representation(instance)
-        request = self.context.get("request")
-        if instance.profile_photo and hasattr(instance.profile_photo, "url"):
-            rep["profile_photo"] = request.build_absolute_uri(instance.profile_photo.url)
-        else:
-            rep["profile_photo"] = None
-        return rep
 
 
 # ✅ Custom JWT Token Serializer (adds role + username to token)
@@ -113,6 +100,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data["username"] = self.user.username
         data["role"] = getattr(self.user, "role", "user")
         return data
+
 
 # ✅ Password Reset Request Serializer
 class PasswordResetRequestSerializer(serializers.Serializer):

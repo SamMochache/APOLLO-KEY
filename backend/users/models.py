@@ -1,4 +1,4 @@
-# backend/apps/users/models.py
+# backend/users/models.py - FIXED
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -27,6 +27,12 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.email} ({self.role})"
+
+    # ✅ FIXED: Added get_full_name() method
+    def get_full_name(self):
+        """Return full name or username as fallback."""
+        full_name = f"{self.first_name} {self.last_name}".strip()
+        return full_name if full_name else self.username
 
     # helper methods
     def is_admin(self):
