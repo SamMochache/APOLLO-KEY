@@ -24,17 +24,32 @@ export default function AttendanceRecorder() {
   const [message, setMessage] = useState("");
 
   // ---------- Fetch Classes ----------
-  useEffect(() => {
-    const fetchClasses = async () => {
-      try {
-        const res = await api.get("/academics/classes/");
-        setClasses(res.data);
-      } catch (error) {
-        console.error("Failed to load classes:", error.message);
+ // ---------- Fetch Classes (Safe Version) ----------
+useEffect(() => {
+  const fetchClasses = async () => {
+    try {
+      const res = await api.get("/academics/classes/");
+      
+      // Support paginated response or direct array
+      let classArray = [];
+      if (Array.isArray(res.data)) {
+        classArray = res.data;
+      } else if (res.data && Array.isArray(res.data.results)) {
+        classArray = res.data.results;
+      } else {
+        console.warn("Unexpected classes response format:", res.data);
       }
-    };
-    fetchClasses();
-  }, []);
+
+      setClasses(classArray);
+    } catch (error) {
+      console.error("Failed to load classes:", error.message);
+      setClasses([]); // fallback to empty array
+    }
+  };
+
+  fetchClasses();
+}, []);
+
 
   // ---------- Fetch Students ----------
   useEffect(() => {
