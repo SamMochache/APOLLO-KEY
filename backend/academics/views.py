@@ -3,9 +3,9 @@ from datetime import datetime
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q, Count
-from .models import Attendance, Class, User, Subject, Timetable
-from .serializers import AttendanceSerializer, ClassSerializer, SubjectSerializer, TimetableSerializer
+from django.db.models import Q, Count, Avg
+from .models import Attendance, Class, User, Subject, Timetable, GradeConfig, Assessment, Grade
+from .serializers import AttendanceSerializer, ClassSerializer, SubjectSerializer, TimetableSerializer, GradeConfigSerializer, AssessmentSerializer, GradeSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from .filters import AttendanceFilter
 from django.utils.decorators import method_decorator
@@ -13,6 +13,7 @@ from django.views.decorators.cache import cache_page
 from django.core.cache import cache
 from django.db import transaction
 from .throttles import UserRateThrottle, BurstRateThrottle, BulkOperationThrottle
+from decimal import Decimal
 
 
 class ClassViewSet(viewsets.ModelViewSet):
@@ -541,3 +542,330 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 {"error": f"Bulk delete failed: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
+class GradeConfigViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing grading scale configurations."""
+    queryset = GradeConfig.objects.all()
+    serializer_class = GradeConfigSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_permissions(self):
+        """Only admins can create/update/delete grading configs."""
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [permissions.IsAdminUser()]
+        return super().get_permissions()
+
+
+class AssessmentViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing assessments."""
+    queryset = Assessment.objects.select_related(
+        'subject', 'class_assigned', 'created_by'
+    ).prefetch_related('grades')
+    serializer_class = AssessmentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['assessment_type', 'subject', 'class_assigned', 'date']
+    
+    def get_queryset(self):
+        """Filter assessments by user role."""
+        user = self.request.user
+        queryset = super().get_queryset()
+        
+        if user.is_superuser or user.role == User.ADMIN:
+            return queryset
+        elif user.role == User.TEACHER:
+            # Teachers see assessments for their subjects/classes
+            return queryset.filter(
+                Q(subject__teacher=user) | Q(class_assigned__teacher=user)
+            )
+        elif user.role == User.STUDENT:
+            # Students see assessments for their classes
+            return queryset.filter(class_assigned__students=user)
+        
+        return queryset.none()
+    
+    @action(detail=True, methods=['get'])
+    def statistics(self, request, pk=None):
+        """Get detailed statistics for an assessment."""
+        assessment = self.get_object()
+        grades = assessment.grades.filter(is_absent=False)
+        
+        if not grades.exists():
+            return Response({
+                'message': 'No grades recorded yet.',
+                'assessment_id': assessment.id,
+                'assessment_name': assessment.name
+            })
+        
+        # Calculate statistics
+        marks_list = list(grades.values_list('marks_obtained', flat=True))
+        marks_list.sort()
+        
+        stats = {
+            'assessment_id': assessment.id,
+            'assessment_name': assessment.name,
+            'total_marks': float(assessment.total_marks),
+            'passing_marks': float(assessment.passing_marks) if assessment.passing_marks else None,
+            'total_students': assessment.class_assigned.students.count(),
+            'graded_count': grades.count(),
+            'absent_count': assessment.grades.filter(is_absent=True).count(),
+            'pending_count': assessment.class_assigned.students.count() - assessment.grades.count(),
+            'average': round(float(grades.aggregate(avg=Avg('marks_obtained'))['avg']), 2),
+            'highest': float(max(marks_list)),
+            'lowest': float(min(marks_list)),
+            'median': float(marks_list[len(marks_list) // 2]),
+            'passing_count': grades.filter(
+                marks_obtained__gte=assessment.passing_marks
+            ).count() if assessment.passing_marks else None,
+            'grade_distribution': {}
+        }
+        
+        # Grade distribution
+        grade_dist = grades.values('grade_letter').annotate(
+            count=Count('id')
+        ).order_by('-count')
+        
+        for item in grade_dist:
+            stats['grade_distribution'][item['grade_letter']] = item['count']
+        
+        return Response(stats)
+    
+    @action(detail=True, methods=['get'])
+    def student_list(self, request, pk=None):
+        """Get list of students for grade entry."""
+        assessment = self.get_object()
+        students = assessment.class_assigned.students.filter(role=User.STUDENT)
+        
+        student_data = []
+        for student in students:
+            try:
+                grade = assessment.grades.get(student=student)
+                grade_data = GradeSerializer(grade).data
+            except Grade.DoesNotExist:
+                grade_data = None
+            
+            student_data.append({
+                'id': student.id,
+                'username': student.username,
+                'full_name': student.get_full_name(),
+                'email': student.email,
+                'grade': grade_data
+            })
+        
+        return Response({
+            'assessment': AssessmentSerializer(assessment).data,
+            'students': student_data
+        })
+
+
+class GradeViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing grades."""
+    queryset = Grade.objects.select_related(
+        'assessment', 'student', 'graded_by',
+        'assessment__subject', 'assessment__class_assigned'
+    )
+    serializer_class = GradeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['student', 'assessment', 'assessment__subject', 'is_absent']
+    
+    def get_queryset(self):
+        """Filter grades by user role."""
+        user = self.request.user
+        queryset = super().get_queryset()
+        
+        if user.is_superuser or user.role == User.ADMIN:
+            return queryset
+        elif user.role == User.TEACHER:
+            # Teachers see grades for their subjects/classes
+            return queryset.filter(
+                Q(assessment__subject__teacher=user) | 
+                Q(assessment__class_assigned__teacher=user)
+            )
+        elif user.role == User.STUDENT:
+            # Students see only their own grades
+            return queryset.filter(student=user)
+        
+        return queryset.none()
+    
+    @action(detail=False, methods=['post'], url_path='bulk-create')
+    def bulk_create(self, request):
+        """Bulk create grades."""
+        grades_data = request.data.get('grades', [])
+        
+        if not grades_data:
+            return Response(
+                {'error': 'No grades provided'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if len(grades_data) > 100:
+            return Response(
+                {'error': 'Maximum 100 grades can be processed at once'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = GradeSerializer(
+            data=grades_data,
+            many=True,
+            context={'request': request}
+        )
+        
+        if serializer.is_valid():
+            try:
+                with transaction.atomic():
+                    created_grades = serializer.save()
+                    return Response(
+                        {
+                            'success': True,
+                            'message': f'{len(created_grades)} grades created successfully',
+                            'data': GradeSerializer(created_grades, many=True).data
+                        },
+                        status=status.HTTP_201_CREATED
+                    )
+            except Exception as e:
+                return Response(
+                    {'error': f'Failed to create grades: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        
+        return Response(
+            {
+                'error': 'Validation failed',
+                'details': serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    @action(detail=False, methods=['put'], url_path='bulk-update')
+    def bulk_update(self, request):
+        """Bulk update grades."""
+        grades_data = request.data.get('grades', [])
+        
+        if not grades_data:
+            return Response(
+                {'error': 'No grades provided'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        updated = []
+        errors = []
+        
+        try:
+            with transaction.atomic():
+                for grade_data in grades_data:
+                    grade_id = grade_data.get('id')
+                    
+                    if not grade_id:
+                        errors.append({'data': grade_data, 'error': 'Missing id'})
+                        continue
+                    
+                    try:
+                        instance = Grade.objects.get(id=grade_id)
+                        serializer = GradeSerializer(
+                            instance,
+                            data=grade_data,
+                            partial=True,
+                            context={'request': request}
+                        )
+                        
+                        if serializer.is_valid():
+                            serializer.save()
+                            updated.append(serializer.data)
+                        else:
+                            errors.append({'id': grade_id, 'errors': serializer.errors})
+                    
+                    except Grade.DoesNotExist:
+                        errors.append({'id': grade_id, 'error': 'Grade not found'})
+        
+        except Exception as e:
+            return Response(
+                {'error': f'Bulk update failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+        response_data = {
+            'success': len(updated) > 0,
+            'updated': len(updated),
+            'data': updated
+        }
+        
+        if errors:
+            response_data['errors'] = errors
+            response_data['failed'] = len(errors)
+        
+        return Response(
+            response_data,
+            status=status.HTTP_200_OK if len(updated) > 0 else status.HTTP_400_BAD_REQUEST
+        )
+    
+    @action(detail=False, methods=['get'], url_path='student-report')
+    def student_report(self, request):
+        """Get comprehensive grade report for a student."""
+        student_id = request.query_params.get('student_id')
+        
+        if not student_id:
+            return Response(
+                {'error': 'student_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            student = User.objects.get(id=student_id, role=User.STUDENT)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check permissions
+        user = request.user
+        if user.role == User.STUDENT and user.id != int(student_id):
+            return Response(
+                {'error': 'You can only view your own grades'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get all grades
+        grades = Grade.objects.filter(student=student).select_related(
+            'assessment', 'assessment__subject'
+        )
+        
+        if not grades.exists():
+            return Response({
+                'student_id': student.id,
+                'student_name': student.get_full_name(),
+                'message': 'No grades found'
+            })
+        
+        # Calculate overall statistics
+        graded = grades.filter(is_absent=False)
+        total_percentage = graded.aggregate(avg=Avg('percentage'))['avg']
+        
+        # Group by subject
+        subjects_data = []
+        subjects = set(g.assessment.subject for g in grades)
+        
+        for subject in subjects:
+            subject_grades = grades.filter(assessment__subject=subject, is_absent=False)
+            
+            if subject_grades.exists():
+                avg_pct = subject_grades.aggregate(avg=Avg('percentage'))['avg']
+                
+                subjects_data.append({
+                    'subject_id': subject.id,
+                    'subject_name': subject.name,
+                    'average_percentage': round(float(avg_pct), 2) if avg_pct else None,
+                    'grades_count': subject_grades.count(),
+                    'grades': GradeSerializer(subject_grades, many=True).data
+                })
+        
+        return Response({
+            'student_id': student.id,
+            'student_name': student.get_full_name(),
+            'overall_percentage': round(float(total_percentage), 2) if total_percentage else None,
+            'total_assessments': grades.count(),
+            'graded_count': graded.count(),
+            'absent_count': grades.filter(is_absent=True).count(),
+            'subjects': subjects_data
+        })

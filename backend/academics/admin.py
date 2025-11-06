@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Class, Subject, Timetable, Attendance
+from .models import Class, Subject, Timetable, Attendance, GradeConfig, Assessment, Grade
 
 @admin.register(Class)
 class ClassAdmin(admin.ModelAdmin):
@@ -29,3 +29,22 @@ class AttendanceAdmin(admin.ModelAdmin):
     )
     ordering = ("-date",)
     date_hierarchy = "date"
+
+@admin.register(GradeConfig)
+class GradeConfigAdmin(admin.ModelAdmin):
+    list_display = ("grade_letter", "min_percentage", "max_percentage", "gpa_value")
+    ordering = ("-min_percentage",)
+
+@admin.register(Assessment)
+class AssessmentAdmin(admin.ModelAdmin):
+    list_display = ("name", "assessment_type", "subject", "class_assigned", "date", "total_marks", "weightage")
+    list_filter = ("assessment_type", "date", "subject", "class_assigned")
+    search_fields = ("name", "subject__name", "class_assigned__name")
+    date_hierarchy = "date"
+
+@admin.register(Grade)
+class GradeAdmin(admin.ModelAdmin):
+    list_display = ("student", "assessment", "marks_obtained", "grade_letter", "percentage", "is_absent")
+    list_filter = ("is_absent", "grade_letter", "assessment__assessment_type")
+    search_fields = ("student__username", "assessment__name")
+    ordering = ("-graded_at",)
