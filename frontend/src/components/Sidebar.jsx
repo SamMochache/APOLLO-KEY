@@ -1,4 +1,4 @@
-// src/components/Sidebar.jsx
+// src/components/Sidebar.jsx - FIXED
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
@@ -13,11 +13,11 @@ import {
   User,
   LogOut,
   CheckSquare,
-  Trophy,         // Make sure Trophy is imported
-  TrendingDown,   // Optional: if you ever add "Needs Attention" icon
-  Award,          // Optional: if you use it
-  Medal,        // Optional: if you use it
-  Edit2,
+  Trophy,
+  TrendingDown,
+  Award,
+  Medal,
+  Edit2,  // ✅ This is already imported - good!
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -35,9 +35,9 @@ export default function Sidebar() {
       { to: "/attendance", label: "Attendance Dashboard", icon: CheckSquare },
       { to: "/attendance/record", label: "Record Attendance", icon: ClipboardList },
       { to: "/attendance/rankings", label: "Attendance Rankings", icon: Trophy },
+      { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },  // ✅ Icon now works
       { to: "/users", label: "Manage Users", icon: Users },
       { to: "/reports", label: "Reports", icon: ClipboardList },
-      { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },
     ],
     teacher: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
@@ -46,7 +46,7 @@ export default function Sidebar() {
       { to: "/timetable/builder", label: "Manage Schedule", icon: CalendarCog },
       { to: "/attendance", label: "Attendance Dashboard", icon: CheckSquare },
       { to: "/attendance/record", label: "Record Attendance", icon: ClipboardList },
-      { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },
+      { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },  // ✅ Icon now works
     ],
     student: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
