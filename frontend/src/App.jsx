@@ -17,6 +17,7 @@ import TimetableDashboard from "./pages/TimetableDashboard";
 import AttendanceDashboard from "./pages/AttendanceDashboard";
 import AttendanceRecorder from "./pages/AttendanceRecorder";
 import AttendanceRankings from "./pages/AttendanceRankings";  
+import GradeEntry from "./pages/GradeEntry"
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -48,6 +49,7 @@ function App() {
           <Route path="/attendance" element={<AttendanceDashboard />} />
           <Route path="/attendance/record" element={<AttendanceRecorder />} />
           <Route path="/attendance/rankings" element={<AttendanceRankings />} /> {/* NEW ROUTE */}
+          <Route path="/grades/entry" element={<GradeEntry />} />
   
           {/* 🕓 Timetable Routes */}
           <Route path="/timetable" element={<TimetableDashboard />} />

@@ -16,7 +16,8 @@ import {
   Trophy,         // Make sure Trophy is imported
   TrendingDown,   // Optional: if you ever add "Needs Attention" icon
   Award,          // Optional: if you use it
-  Medal           // Optional: if you use it
+  Medal,        // Optional: if you use it
+  Edit2,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -36,6 +37,7 @@ export default function Sidebar() {
       { to: "/attendance/rankings", label: "Attendance Rankings", icon: Trophy },
       { to: "/users", label: "Manage Users", icon: Users },
       { to: "/reports", label: "Reports", icon: ClipboardList },
+      { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },
     ],
     teacher: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
@@ -44,6 +46,7 @@ export default function Sidebar() {
       { to: "/timetable/builder", label: "Manage Schedule", icon: CalendarCog },
       { to: "/attendance", label: "Attendance Dashboard", icon: CheckSquare },
       { to: "/attendance/record", label: "Record Attendance", icon: ClipboardList },
+      { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },
     ],
     student: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
