@@ -18,6 +18,7 @@ import {
   Award,
   Medal,
   Edit2,  // ✅ This is already imported - good!
+  TrendingUp,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -38,6 +39,7 @@ export default function Sidebar() {
       { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },  // ✅ Icon now works
       { to: "/users", label: "Manage Users", icon: Users },
       { to: "/reports", label: "Reports", icon: ClipboardList },
+      { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
     ],
     teacher: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
@@ -47,6 +49,7 @@ export default function Sidebar() {
       { to: "/attendance", label: "Attendance Dashboard", icon: CheckSquare },
       { to: "/attendance/record", label: "Record Attendance", icon: ClipboardList },
       { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },  // ✅ Icon now works
+      { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
     ],
     student: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
@@ -54,18 +57,21 @@ export default function Sidebar() {
       { to: "/timetable", label: "My Schedule", icon: Calendar },
       { to: "/attendance", label: "My Attendance", icon: CheckSquare },
       { to: "/tasks", label: "Assignments", icon: ClipboardList },
+      { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
     ],
     parent: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/academics", label: "Child's Classes", icon: BookOpen },
       { to: "/attendance", label: "Child's Attendance", icon: CheckSquare },
       { to: "/updates", label: "School Updates", icon: ClipboardList },
+      { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
     ],
     staff: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/academics", label: "Academic Info", icon: BookOpen },
       { to: "/attendance", label: "Attendance Reports", icon: CheckSquare },
       { to: "/reports", label: "Reports", icon: ClipboardList },
+      { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
     ],
   };
 
