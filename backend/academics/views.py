@@ -871,214 +871,214 @@ class GradeViewSet(viewsets.ModelViewSet):
         })
 # backend/academics/views.py - ADD THIS METHOD TO GradeViewSet
 
-@action(detail=False, methods=['get'], url_path='statistics')
-def statistics(self, request):
-    """
-    Get comprehensive grade statistics with filtering support.
-    
-    Query Parameters:
-    - subject: Filter by subject ID
-    - class: Filter by class ID
-    - start_date: Filter grades from this date
-    - end_date: Filter grades until this date
-    """
-    user = request.user
-    
-    # Base queryset with permissions
-    queryset = Grade.objects.select_related(
-        'assessment', 'student', 
-        'assessment__subject', 'assessment__class_assigned'
-    ).filter(is_absent=False)
-    
-    # Apply role-based filtering
-    if user.role == User.TEACHER:
-        queryset = queryset.filter(
-            Q(assessment__subject__teacher=user) | 
-            Q(assessment__class_assigned__teacher=user)
-        )
-    elif user.role == User.STUDENT:
-        queryset = queryset.filter(student=user)
-    elif user.role not in [User.ADMIN]:
-        return Response(
-            {'error': 'Unauthorized'}, 
-            status=status.HTTP_403_FORBIDDEN
-        )
-    
-    # Apply filters
-    subject_id = request.query_params.get('subject')
-    class_id = request.query_params.get('class')
-    start_date = request.query_params.get('start_date')
-    end_date = request.query_params.get('end_date')
-    
-    if subject_id:
-        queryset = queryset.filter(assessment__subject_id=subject_id)
-    if class_id:
-        queryset = queryset.filter(assessment__class_assigned_id=class_id)
-    if start_date:
-        queryset = queryset.filter(assessment__date__gte=start_date)
-    if end_date:
-        queryset = queryset.filter(assessment__date__lte=end_date)
-    
-    # Check if we have data
-    if not queryset.exists():
+    @action(detail=False, methods=['get'], url_path='statistics')
+    def statistics(self, request):
+        """
+        Get comprehensive grade statistics with filtering support.
+        
+        Query Parameters:
+        - subject: Filter by subject ID
+        - class: Filter by class ID
+        - start_date: Filter grades from this date
+        - end_date: Filter grades until this date
+        """
+        user = request.user
+        
+        # Base queryset with permissions
+        queryset = Grade.objects.select_related(
+            'assessment', 'student', 
+            'assessment__subject', 'assessment__class_assigned'
+        ).filter(is_absent=False)
+        
+        # Apply role-based filtering
+        if user.role == User.TEACHER:
+            queryset = queryset.filter(
+                Q(assessment__subject__teacher=user) | 
+                Q(assessment__class_assigned__teacher=user)
+            )
+        elif user.role == User.STUDENT:
+            queryset = queryset.filter(student=user)
+        elif user.role not in [User.ADMIN]:
+            return Response(
+                {'error': 'Unauthorized'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Apply filters
+        subject_id = request.query_params.get('subject')
+        class_id = request.query_params.get('class')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        if subject_id:
+            queryset = queryset.filter(assessment__subject_id=subject_id)
+        if class_id:
+            queryset = queryset.filter(assessment__class_assigned_id=class_id)
+        if start_date:
+            queryset = queryset.filter(assessment__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(assessment__date__lte=end_date)
+        
+        # Check if we have data
+        if not queryset.exists():
+            return Response({
+                'overview': {
+                    'totalAssessments': 0,
+                    'totalStudents': 0,
+                    'averageScore': 0,
+                    'passRate': 0
+                },
+                'gradeDistribution': [],
+                'assessmentPerformance': [],
+                'topPerformers': [],
+                'needsAttention': [],
+                'subjectComparison': []
+            })
+        
+        # Calculate overview statistics
+        total_assessments = queryset.values('assessment').distinct().count()
+        total_students = queryset.values('student').distinct().count()
+        average_percentage = queryset.aggregate(avg=Avg('percentage'))['avg'] or 0
+        
+        # Calculate pass rate (assuming 40% is passing)
+        passing_grades = queryset.filter(percentage__gte=40).count()
+        total_grades = queryset.count()
+        pass_rate = (passing_grades / total_grades * 100) if total_grades > 0 else 0
+        
+        # Grade distribution
+        grade_counts = queryset.values('grade_letter').annotate(
+            count=Count('id')
+        ).order_by('-count')
+        
+        total_graded = sum(item['count'] for item in grade_counts)
+        grade_distribution = []
+        for item in grade_counts:
+            if item['grade_letter']:
+                grade_distribution.append({
+                    'grade': item['grade_letter'],
+                    'count': item['count'],
+                    'percentage': round((item['count'] / total_graded * 100), 1)
+                })
+        
+        # Assessment performance
+        assessment_performance = []
+        assessments = queryset.values(
+            'assessment__id',
+            'assessment__name',
+            'assessment__assessment_type'
+        ).annotate(
+            average=Avg('percentage')
+        ).order_by('assessment__date')[:10]  # Limit to 10 most recent
+        
+        for assessment in assessments:
+            assessment_performance.append({
+                'name': assessment['assessment__name'][:20],  # Truncate long names
+                'average': round(float(assessment['average']), 1),
+                'type': assessment['assessment__assessment_type']
+            })
+        
+        # Top performers (students with highest average)
+        top_performers = []
+        student_averages = queryset.values(
+            'student__id',
+            'student__username',
+            'student__first_name',
+            'student__last_name'
+        ).annotate(
+            average=Avg('percentage')
+        ).order_by('-average')[:5]
+        
+        for student in student_averages:
+            # Get most common grade letter
+            common_grade = queryset.filter(
+                student_id=student['student__id']
+            ).values('grade_letter').annotate(
+                count=Count('id')
+            ).order_by('-count').first()
+            
+            full_name = f"{student['student__first_name']} {student['student__last_name']}".strip()
+            if not full_name:
+                full_name = student['student__username']
+            
+            top_performers.append({
+                'id': student['student__id'],
+                'name': full_name,
+                'average': round(float(student['average']), 1),
+                'grade': common_grade['grade_letter'] if common_grade else 'N/A'
+            })
+        
+        # Students needing attention (lowest averages)
+        needs_attention = []
+        low_performers = queryset.values(
+            'student__id',
+            'student__username',
+            'student__first_name',
+            'student__last_name'
+        ).annotate(
+            average=Avg('percentage')
+        ).order_by('average')[:5]
+        
+        for student in low_performers:
+            # Get grade trend (compare last 3 vs previous 3 assessments)
+            student_grades = queryset.filter(
+                student_id=student['student__id']
+            ).order_by('-assessment__date').values_list('percentage', flat=True)[:6]
+            
+            student_grades_list = list(student_grades)
+            trend = 'stable'
+            if len(student_grades_list) >= 6:
+                recent_avg = sum(student_grades_list[:3]) / 3
+                previous_avg = sum(student_grades_list[3:6]) / 3
+                if recent_avg > previous_avg + 5:
+                    trend = 'improving'
+                elif recent_avg < previous_avg - 5:
+                    trend = 'declining'
+            
+            common_grade = queryset.filter(
+                student_id=student['student__id']
+            ).values('grade_letter').annotate(
+                count=Count('id')
+            ).order_by('-count').first()
+            
+            full_name = f"{student['student__first_name']} {student['student__last_name']}".strip()
+            if not full_name:
+                full_name = student['student__username']
+            
+            needs_attention.append({
+                'id': student['student__id'],
+                'name': full_name,
+                'average': round(float(student['average']), 1),
+                'grade': common_grade['grade_letter'] if common_grade else 'N/A',
+                'trend': trend
+            })
+        
+        # Subject comparison
+        subject_comparison = []
+        subjects = queryset.values(
+            'assessment__subject__id',
+            'assessment__subject__name'
+        ).annotate(
+            average=Avg('percentage'),
+            count=Count('student', distinct=True)
+        ).order_by('-average')
+        
+        for subject in subjects:
+            subject_comparison.append({
+                'subject': subject['assessment__subject__name'],
+                'average': round(float(subject['average']), 1),
+                'count': subject['count']
+            })
+        
         return Response({
             'overview': {
-                'totalAssessments': 0,
-                'totalStudents': 0,
-                'averageScore': 0,
-                'passRate': 0
+                'totalAssessments': total_assessments,
+                'totalStudents': total_students,
+                'averageScore': round(float(average_percentage), 1),
+                'passRate': round(pass_rate, 1)
             },
-            'gradeDistribution': [],
-            'assessmentPerformance': [],
-            'topPerformers': [],
-            'needsAttention': [],
-            'subjectComparison': []
+            'gradeDistribution': grade_distribution,
+            'assessmentPerformance': assessment_performance,
+            'topPerformers': top_performers,
+            'needsAttention': needs_attention,
+            'subjectComparison': subject_comparison
         })
-    
-    # Calculate overview statistics
-    total_assessments = queryset.values('assessment').distinct().count()
-    total_students = queryset.values('student').distinct().count()
-    average_percentage = queryset.aggregate(avg=Avg('percentage'))['avg'] or 0
-    
-    # Calculate pass rate (assuming 40% is passing)
-    passing_grades = queryset.filter(percentage__gte=40).count()
-    total_grades = queryset.count()
-    pass_rate = (passing_grades / total_grades * 100) if total_grades > 0 else 0
-    
-    # Grade distribution
-    grade_counts = queryset.values('grade_letter').annotate(
-        count=Count('id')
-    ).order_by('-count')
-    
-    total_graded = sum(item['count'] for item in grade_counts)
-    grade_distribution = []
-    for item in grade_counts:
-        if item['grade_letter']:
-            grade_distribution.append({
-                'grade': item['grade_letter'],
-                'count': item['count'],
-                'percentage': round((item['count'] / total_graded * 100), 1)
-            })
-    
-    # Assessment performance
-    assessment_performance = []
-    assessments = queryset.values(
-        'assessment__id',
-        'assessment__name',
-        'assessment__assessment_type'
-    ).annotate(
-        average=Avg('percentage')
-    ).order_by('assessment__date')[:10]  # Limit to 10 most recent
-    
-    for assessment in assessments:
-        assessment_performance.append({
-            'name': assessment['assessment__name'][:20],  # Truncate long names
-            'average': round(float(assessment['average']), 1),
-            'type': assessment['assessment__assessment_type']
-        })
-    
-    # Top performers (students with highest average)
-    top_performers = []
-    student_averages = queryset.values(
-        'student__id',
-        'student__username',
-        'student__first_name',
-        'student__last_name'
-    ).annotate(
-        average=Avg('percentage')
-    ).order_by('-average')[:5]
-    
-    for student in student_averages:
-        # Get most common grade letter
-        common_grade = queryset.filter(
-            student_id=student['student__id']
-        ).values('grade_letter').annotate(
-            count=Count('id')
-        ).order_by('-count').first()
-        
-        full_name = f"{student['student__first_name']} {student['student__last_name']}".strip()
-        if not full_name:
-            full_name = student['student__username']
-        
-        top_performers.append({
-            'id': student['student__id'],
-            'name': full_name,
-            'average': round(float(student['average']), 1),
-            'grade': common_grade['grade_letter'] if common_grade else 'N/A'
-        })
-    
-    # Students needing attention (lowest averages)
-    needs_attention = []
-    low_performers = queryset.values(
-        'student__id',
-        'student__username',
-        'student__first_name',
-        'student__last_name'
-    ).annotate(
-        average=Avg('percentage')
-    ).order_by('average')[:5]
-    
-    for student in low_performers:
-        # Get grade trend (compare last 3 vs previous 3 assessments)
-        student_grades = queryset.filter(
-            student_id=student['student__id']
-        ).order_by('-assessment__date').values_list('percentage', flat=True)[:6]
-        
-        student_grades_list = list(student_grades)
-        trend = 'stable'
-        if len(student_grades_list) >= 6:
-            recent_avg = sum(student_grades_list[:3]) / 3
-            previous_avg = sum(student_grades_list[3:6]) / 3
-            if recent_avg > previous_avg + 5:
-                trend = 'improving'
-            elif recent_avg < previous_avg - 5:
-                trend = 'declining'
-        
-        common_grade = queryset.filter(
-            student_id=student['student__id']
-        ).values('grade_letter').annotate(
-            count=Count('id')
-        ).order_by('-count').first()
-        
-        full_name = f"{student['student__first_name']} {student['student__last_name']}".strip()
-        if not full_name:
-            full_name = student['student__username']
-        
-        needs_attention.append({
-            'id': student['student__id'],
-            'name': full_name,
-            'average': round(float(student['average']), 1),
-            'grade': common_grade['grade_letter'] if common_grade else 'N/A',
-            'trend': trend
-        })
-    
-    # Subject comparison
-    subject_comparison = []
-    subjects = queryset.values(
-        'assessment__subject__id',
-        'assessment__subject__name'
-    ).annotate(
-        average=Avg('percentage'),
-        count=Count('student', distinct=True)
-    ).order_by('-average')
-    
-    for subject in subjects:
-        subject_comparison.append({
-            'subject': subject['assessment__subject__name'],
-            'average': round(float(subject['average']), 1),
-            'count': subject['count']
-        })
-    
-    return Response({
-        'overview': {
-            'totalAssessments': total_assessments,
-            'totalStudents': total_students,
-            'averageScore': round(float(average_percentage), 1),
-            'passRate': round(pass_rate, 1)
-        },
-        'gradeDistribution': grade_distribution,
-        'assessmentPerformance': assessment_performance,
-        'topPerformers': top_performers,
-        'needsAttention': needs_attention,
-        'subjectComparison': subject_comparison
-    })
