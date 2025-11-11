@@ -14,6 +14,9 @@ from django.core.cache import cache
 from django.db import transaction
 from .throttles import UserRateThrottle, BurstRateThrottle, BulkOperationThrottle
 from decimal import Decimal
+from django.http import FileResponse, HttpResponse
+from .report_generator import ReportCardGenerator
+
 
 
 class ClassViewSet(viewsets.ModelViewSet):
@@ -1082,3 +1085,97 @@ class GradeViewSet(viewsets.ModelViewSet):
             'needsAttention': needs_attention,
             'subjectComparison': subject_comparison
         })
+    
+    # Add to GradeViewSet class
+    @action(detail=False, methods=['post'], url_path='generate-report')
+    def generate_report(self, request):
+        """Generate PDF report card for a student"""
+        student_id = request.data.get('student_id')
+        class_id = request.data.get('class_id')
+        term = request.data.get('term')
+        academic_year = request.data.get('academic_year')
+        
+        if not student_id:
+            return Response(
+                {'error': 'student_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Permission check
+        user = request.user
+        if user.role == User.STUDENT and user.id != int(student_id):
+            return Response(
+                {'error': 'You can only view your own report'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            generator = ReportCardGenerator()
+            buffer = generator.generate_report(
+                student_id=student_id,
+                class_id=class_id,
+                term=term,
+                academic_year=academic_year
+            )
+            
+            # Get student name for filename
+            student = User.objects.get(id=student_id)
+            filename = f"report_card_{student.username}_{academic_year or 'current'}.pdf"
+            
+            return FileResponse(
+                buffer,
+                as_attachment=True,
+                filename=filename,
+                content_type='application/pdf'
+            )
+            
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to generate report: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'], url_path='generate-bulk-reports')
+    def generate_bulk_reports(self, request):
+        """Generate PDF report cards for all students in a class"""
+        class_id = request.data.get('class_id')
+        term = request.data.get('term')
+        academic_year = request.data.get('academic_year')
+        
+        if not class_id:
+            return Response(
+                {'error': 'class_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Permission check - only teachers and admins
+        if request.user.role not in [User.ADMIN, User.TEACHER]:
+            return Response(
+                {'error': 'Only teachers and admins can generate bulk reports'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            generator = ReportCardGenerator()
+            reports = generator.generate_bulk_reports(
+                class_id=class_id,
+                term=term,
+                academic_year=academic_year
+            )
+            
+            return Response({
+                'success': True,
+                'message': f'Generated {len(reports)} report cards',
+                'count': len(reports)
+            })
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to generate bulk reports: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

@@ -9,6 +9,7 @@ import {
   Users, BookOpen, Target, RefreshCw
 } from 'lucide-react';
 import gradeAnalyticsService from '../api/gradeService';
+import ReportCardGenerator from '../pages/ReportCardGenerator';
 
 export default function GradeAnalyticsDashboard() {
   const [statistics, setStatistics] = useState(null);
@@ -397,6 +398,10 @@ export default function GradeAnalyticsDashboard() {
               <Download className="w-5 h-5" />
               Export Full Report
             </button>
+            {/* Report Card Generator */}
+            <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+              <ReportCardGenerator />
+            </div>
           </div>
         </>
       )}
