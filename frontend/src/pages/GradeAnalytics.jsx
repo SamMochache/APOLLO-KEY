@@ -1,3 +1,4 @@
+// frontend/src/pages/GradeAnalytics.jsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
@@ -5,9 +6,9 @@ import {
 } from 'recharts';
 import {
   TrendingUp, Award, AlertCircle, Download, Filter,
-  Users, BookOpen, Target
+  Users, BookOpen, Target, RefreshCw
 } from 'lucide-react';
-import gradeAnalyticsApi from '../api/gradeAnalyticsApi'; // ✅ import your real API
+import gradeAnalyticsService from '../api/gradeService';
 
 export default function GradeAnalyticsDashboard() {
   const [statistics, setStatistics] = useState(null);
@@ -27,8 +28,8 @@ export default function GradeAnalyticsDashboard() {
     const fetchInitialData = async () => {
       try {
         const [subs, cls] = await Promise.all([
-          gradeAnalyticsApi.getSubjects(),
-          gradeAnalyticsApi.getClasses()
+          gradeAnalyticsService.getSubjects(),
+          gradeAnalyticsService.getClasses()
         ]);
         setSubjects(subs);
         setClasses(cls);
@@ -42,12 +43,18 @@ export default function GradeAnalyticsDashboard() {
 
   const fetchStatistics = async () => {
     setLoading(true);
+    setMessage({ type: '', text: '' });
+    
     try {
-      const data = await gradeAnalyticsApi.getGradeStatistics(filters);
+      const data = await gradeAnalyticsService.getStatistics(filters);
       setStatistics(data);
+      
+      if (data.overview.totalAssessments === 0) {
+        showMessage('info', 'No grade data available for the selected filters');
+      }
     } catch (error) {
       console.error(error);
-      showMessage('error', 'Failed to load statistics');
+      showMessage('error', error.message || 'Failed to load statistics');
     } finally {
       setLoading(false);
     }
@@ -55,23 +62,51 @@ export default function GradeAnalyticsDashboard() {
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
-    setTimeout(() => setMessage({ type: '', text: '' }), 4000);
+    setTimeout(() => setMessage({ type: '', text: '' }), 5000);
   };
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const exportReport = () => {
-    showMessage('success', 'Report exported successfully!');
+  const handleApplyFilters = () => {
+    fetchStatistics();
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      subject: '',
+      class: '',
+      startDate: '',
+      endDate: ''
+    });
+    // Fetch with cleared filters
+    gradeAnalyticsService.getStatistics({}).then(data => {
+      setStatistics(data);
+    });
+  };
+
+  const exportReport = async () => {
+    try {
+      await gradeAnalyticsService.exportStatistics(filters);
+      showMessage('success', 'Report exported successfully!');
+    } catch (error) {
+      showMessage('error', 'Failed to export report');
+    }
   };
 
   const COLORS = {
-    A: '#10b981',
-    B: '#3b82f6',
-    C: '#f59e0b',
-    D: '#f97316',
-    F: '#ef4444'
+    'A+': '#10b981',
+    'A': '#10b981',
+    'A-': '#3b82f6',
+    'B+': '#3b82f6',
+    'B': '#3b82f6',
+    'B-': '#f59e0b',
+    'C+': '#f59e0b',
+    'C': '#f59e0b',
+    'C-': '#f97316',
+    'D': '#f97316',
+    'F': '#ef4444'
   };
 
   const getTrendIcon = (trend) => {
@@ -91,8 +126,6 @@ export default function GradeAnalyticsDashboard() {
     );
   }
 
-  if (!statistics) return null;
-
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
@@ -106,8 +139,10 @@ export default function GradeAnalyticsDashboard() {
 
       {/* Message Banner */}
       {message.text && (
-        <div className={`mb-4 p-4 rounded-lg flex items-center gap-2 ${
-          message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        <div className={`mb-4 p-4 rounded-lg flex items-center gap-2 animate-fadeIn ${
+          message.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 
+          message.type === 'info' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+          'bg-red-100 text-red-800 border border-red-200'
         }`}>
           <AlertCircle className="w-5 h-5" />
           <span>{message.text}</span>
@@ -116,7 +151,7 @@ export default function GradeAnalyticsDashboard() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-md p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
           <div>
             <label className="block text-sm font-medium mb-2">Subject</label>
             <select
@@ -166,168 +201,205 @@ export default function GradeAnalyticsDashboard() {
           </div>
 
           <button
-            onClick={fetchStatistics}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            onClick={handleApplyFilters}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 justify-center"
           >
             <Filter className="w-4 h-4" />
             Apply
           </button>
+
+          <button
+            onClick={handleClearFilters}
+            className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 flex items-center gap-2 justify-center"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Clear
+          </button>
         </div>
       </div>
 
-      {/* Overview Cards */}
-      {statistics.overview && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Assessments</p>
-                <p className="text-3xl font-bold text-blue-600">{statistics.overview.totalAssessments}</p>
-              </div>
-              <BookOpen className="w-12 h-12 text-blue-500 opacity-50" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Students</p>
-                <p className="text-3xl font-bold text-green-600">{statistics.overview.totalStudents}</p>
-              </div>
-              <Users className="w-12 h-12 text-green-500 opacity-50" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Average Score</p>
-                <p className="text-3xl font-bold text-purple-600">{statistics.overview.averageScore}%</p>
-              </div>
-              <Target className="w-12 h-12 text-purple-500 opacity-50" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Pass Rate</p>
-                <p className="text-3xl font-bold text-yellow-600">{statistics.overview.passRate}%</p>
-              </div>
-              <Award className="w-12 h-12 text-yellow-500 opacity-50" />
-            </div>
-          </div>
+      {!statistics ? (
+        <div className="bg-white rounded-xl shadow-md p-12 text-center">
+          <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+          <p className="text-gray-500">No grade data available</p>
         </div>
+      ) : (
+        <>
+          {/* Overview Cards */}
+          {statistics.overview && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Total Assessments</p>
+                    <p className="text-3xl font-bold text-blue-600">{statistics.overview.totalAssessments}</p>
+                  </div>
+                  <BookOpen className="w-12 h-12 text-blue-500 opacity-50" />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Total Students</p>
+                    <p className="text-3xl font-bold text-green-600">{statistics.overview.totalStudents}</p>
+                  </div>
+                  <Users className="w-12 h-12 text-green-500 opacity-50" />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Average Score</p>
+                    <p className="text-3xl font-bold text-purple-600">{statistics.overview.averageScore}%</p>
+                  </div>
+                  <Target className="w-12 h-12 text-purple-500 opacity-50" />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Pass Rate</p>
+                    <p className="text-3xl font-bold text-yellow-600">{statistics.overview.passRate}%</p>
+                  </div>
+                  <Award className="w-12 h-12 text-yellow-500 opacity-50" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Grade Distribution & Assessment Performance */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-xl font-bold mb-4">Grade Distribution</h2>
+              {statistics.gradeDistribution && statistics.gradeDistribution.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={statistics.gradeDistribution}
+                      dataKey="count"
+                      nameKey="grade"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ grade, percentage }) => `${grade}: ${percentage}%`}
+                    >
+                      {statistics.gradeDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[entry.grade] || '#94a3b8'} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center py-12 text-gray-500">No grade distribution data</div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-xl font-bold mb-4">Assessment Performance</h2>
+              {statistics.assessmentPerformance && statistics.assessmentPerformance.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={statistics.assessmentPerformance}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} interval={0} />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip />
+                    <Bar dataKey="average" fill="#3b82f6" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center py-12 text-gray-500">No assessment data</div>
+              )}
+            </div>
+          </div>
+
+          {/* Top & At-Risk Students */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <Award className="text-green-600" />
+                Top Performers
+              </h2>
+              {statistics.topPerformers && statistics.topPerformers.length > 0 ? (
+                <div className="space-y-3">
+                  {statistics.topPerformers.map((student, index) => (
+                    <div key={student.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl font-bold text-green-600">#{index + 1}</span>
+                        <div>
+                          <p className="font-semibold">{student.name}</p>
+                          <p className="text-sm text-gray-600">Grade: {student.grade}</p>
+                        </div>
+                      </div>
+                      <span className="text-lg font-bold text-green-600">{student.average}%</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">No data available</div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <AlertCircle className="text-red-600" />
+                Needs Attention
+              </h2>
+              {statistics.needsAttention && statistics.needsAttention.length > 0 ? (
+                <div className="space-y-3">
+                  {statistics.needsAttention.map((student) => (
+                    <div key={student.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{getTrendIcon(student.trend)}</span>
+                        <div>
+                          <p className="font-semibold">{student.name}</p>
+                          <p className="text-sm text-gray-600">Grade: {student.grade} • {student.trend}</p>
+                        </div>
+                      </div>
+                      <span className="text-lg font-bold text-red-600">{student.average}%</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">No data available</div>
+              )}
+            </div>
+          </div>
+
+          {/* Subject Comparison */}
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <h2 className="text-xl font-bold mb-4">Subject Comparison</h2>
+            {statistics.subjectComparison && statistics.subjectComparison.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={statistics.subjectComparison}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="subject" angle={-45} textAnchor="end" height={100} />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="average" fill="#8b5cf6" name="Average Score" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-center py-12 text-gray-500">No subject comparison data</div>
+            )}
+          </div>
+
+          {/* Export Button */}
+          <div className="bg-white rounded-xl shadow-md p-4 flex justify-end">
+            <button
+              onClick={exportReport}
+              className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              <Download className="w-5 h-5" />
+              Export Full Report
+            </button>
+          </div>
+        </>
       )}
-
-      {/* Grade Distribution & Assessment Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">Grade Distribution</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={statistics.gradeDistribution}
-                dataKey="count"
-                nameKey="grade"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                label={({ grade, percentage }) => `${grade}: ${percentage}%`}
-              >
-                {statistics.gradeDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[entry.grade]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4">Assessment Performance</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={statistics.assessmentPerformance}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-              <YAxis domain={[0, 100]} />
-              <Tooltip />
-              <Bar dataKey="average" fill="#3b82f6" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Top & At-Risk Students */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Award className="text-green-600" />
-            Top Performers
-          </h2>
-          <div className="space-y-3">
-            {statistics.topPerformers?.map((student, index) => (
-              <div key={student.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl font-bold text-green-600">#{index + 1}</span>
-                  <div>
-                    <p className="font-semibold">{student.name}</p>
-                    <p className="text-sm text-gray-600">Grade: {student.grade}</p>
-                  </div>
-                </div>
-                <span className="text-lg font-bold text-green-600">{student.average}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <AlertCircle className="text-red-600" />
-            Needs Attention
-          </h2>
-          <div className="space-y-3">
-            {statistics.needsAttention?.map((student) => (
-              <div key={student.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{getTrendIcon(student.trend)}</span>
-                  <div>
-                    <p className="font-semibold">{student.name}</p>
-                    <p className="text-sm text-gray-600">Grade: {student.grade} • {student.trend}</p>
-                  </div>
-                </div>
-                <span className="text-lg font-bold text-red-600">{student.average}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Subject Comparison */}
-      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-        <h2 className="text-xl font-bold mb-4">Subject Comparison</h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={statistics.subjectComparison}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="subject" />
-            <YAxis domain={[0, 100]} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="average" fill="#8b5cf6" name="Average Score" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Export Button */}
-      <div className="bg-white rounded-xl shadow-md p-4 flex justify-end">
-        <button
-          onClick={exportReport}
-          className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
-        >
-          <Download className="w-5 h-5" />
-          Export Full Report
-        </button>
-      </div>
     </div>
   );
 }

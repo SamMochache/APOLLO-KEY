@@ -1,4 +1,4 @@
-// frontend/src/api/gradeService.js
+// frontend/src/api/gradeService.js - COMPLETE FIXED VERSION
 import api from './axios';
 
 class GradeAnalyticsService {

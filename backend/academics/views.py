@@ -869,6 +869,8 @@ class GradeViewSet(viewsets.ModelViewSet):
             'absent_count': grades.filter(is_absent=True).count(),
             'subjects': subjects_data
         })
+# backend/academics/views.py - ADD THIS METHOD TO GradeViewSet
+
 @action(detail=False, methods=['get'], url_path='statistics')
 def statistics(self, request):
     """
@@ -966,11 +968,11 @@ def statistics(self, request):
         'assessment__assessment_type'
     ).annotate(
         average=Avg('percentage')
-    ).order_by('assessment__date')
+    ).order_by('assessment__date')[:10]  # Limit to 10 most recent
     
-    for assessment in assessments[:10]:  # Limit to 10 most recent
+    for assessment in assessments:
         assessment_performance.append({
-            'name': assessment['assessment__name'],
+            'name': assessment['assessment__name'][:20],  # Truncate long names
             'average': round(float(assessment['average']), 1),
             'type': assessment['assessment__assessment_type']
         })
@@ -1022,10 +1024,11 @@ def statistics(self, request):
             student_id=student['student__id']
         ).order_by('-assessment__date').values_list('percentage', flat=True)[:6]
         
+        student_grades_list = list(student_grades)
         trend = 'stable'
-        if len(student_grades) >= 6:
-            recent_avg = sum(list(student_grades)[:3]) / 3
-            previous_avg = sum(list(student_grades)[3:6]) / 3
+        if len(student_grades_list) >= 6:
+            recent_avg = sum(student_grades_list[:3]) / 3
+            previous_avg = sum(student_grades_list[3:6]) / 3
             if recent_avg > previous_avg + 5:
                 trend = 'improving'
             elif recent_avg < previous_avg - 5:
