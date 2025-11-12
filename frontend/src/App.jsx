@@ -19,6 +19,7 @@ import AttendanceRecorder from "./pages/AttendanceRecorder";
 import AttendanceRankings from "./pages/AttendanceRankings";  
 import GradeEntry from "./pages/GradeEntry"
 import GradeAnalytics from "./pages/GradeAnalytics";
+import ParentDashboard from "./pages/ParentDashboard";
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -52,6 +53,8 @@ function App() {
           <Route path="/attendance/rankings" element={<AttendanceRankings />} /> {/* NEW ROUTE */}
           <Route path="/grades/entry" element={<GradeEntry />} />
           <Route path="/grades/analytics" element={<GradeAnalytics />} />
+
+
   
           {/* 🕓 Timetable Routes */}
           <Route path="/timetable" element={<TimetableDashboard />} />
@@ -83,10 +86,10 @@ function App() {
             }
           />
           <Route
-            path="/parent"
+            path="/parent-portal"
             element={
               <RoleProtectedRoute role="parent">
-                <Dashboard />
+                <ParentDashboard />
               </RoleProtectedRoute>
             }
           />

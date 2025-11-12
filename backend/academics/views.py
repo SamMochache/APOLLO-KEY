@@ -4,8 +4,8 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q, Count, Avg
-from .models import Attendance, Class, User, Subject, Timetable, GradeConfig, Assessment, Grade
-from .serializers import AttendanceSerializer, ClassSerializer, SubjectSerializer, TimetableSerializer, GradeConfigSerializer, AssessmentSerializer, GradeSerializer
+from .models import Attendance, Class, User, Subject, Timetable, GradeConfig, Assessment, Grade, ParentStudentRelationship
+from .serializers import AttendanceSerializer, ClassSerializer, SubjectSerializer, TimetableSerializer, GradeConfigSerializer, AssessmentSerializer, GradeSerializer, ParentStudentRelationshipSerializer,ChildGradeSerializer,ChildAttendanceSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from .filters import AttendanceFilter
 from django.utils.decorators import method_decorator
@@ -1179,5 +1179,404 @@ class GradeViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to generate bulk reports: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class ParentViewSet(viewsets.ViewSet):
+    """ViewSet for parent portal functionality."""
+    
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset_for_parent(self, parent):
+        """Get all parent-student relationships for a parent."""
+        return ParentStudentRelationship.objects.filter(
+            parent=parent
+        ).select_related('student')
+    
+    def check_parent_access(self, parent, student, permission):
+        """Check if parent has access to student's data."""
+        try:
+            relationship = ParentStudentRelationship.objects.get(
+                parent=parent,
+                student=student
+            )
+            return getattr(relationship, permission, False)
+        except ParentStudentRelationship.DoesNotExist:
+            return False
+    
+    # ===== Children Management =====
+    
+    @action(detail=False, methods=['get'])
+    def my_children(self, request):
+        """
+        Get all children linked to the parent.
         
+        Returns list of students with basic info and relationship details.
+        """
+        if request.user.role != User.PARENT:
+            return Response(
+                {'error': 'Only parents can access this endpoint'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        relationships = self.get_queryset_for_parent(request.user)
+        serializer = ParentStudentRelationshipSerializer(
+            relationships,
+            many=True,
+            context={'request': request}
+        )
+        
+        return Response({
+            'total_children': relationships.count(),
+            'children': serializer.data
+        })
+    
+    @action(detail=False, methods=['post'])
+    def add_child(self, request):
+        """
+        Admin endpoint to link a student to a parent.
+        Requires parent and student IDs.
+        """
+        if request.user.role not in [User.ADMIN, User.STAFF]:
+            return Response(
+                {'error': 'Only admins can add child relationships'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            parent_id = request.data.get('parent_id')
+            student_id = request.data.get('student_id')
+            
+            if not parent_id or not student_id:
+                return Response(
+                    {'error': 'parent_id and student_id are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            parent = User.objects.get(id=parent_id, role=User.PARENT)
+            student = User.objects.get(id=student_id, role=User.STUDENT)
+            
+            relationship, created = ParentStudentRelationship.objects.get_or_create(
+                parent=parent,
+                student=student,
+                defaults={
+                    'relationship_type': request.data.get('relationship_type', 'guardian'),
+                    'is_primary_contact': request.data.get('is_primary_contact', False)
+                }
+            )
+            
+            if created:
+                serializer = ParentStudentRelationshipSerializer(
+                    relationship,
+                    context={'request': request}
+                )
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                return Response(
+                    {'message': 'Relationship already exists'},
+                    status=status.HTTP_200_OK
+                )
+        
+        except User.DoesNotExist as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    # ===== Child Grades =====
+    
+    @action(detail=False, methods=['get'], url_path='child/(?P<student_id>[^/.]+)/grades')
+    def child_grades(self, request, student_id=None):
+        """
+        Get grades for a specific child.
+        
+        Query parameters:
+        - subject: Filter by subject ID
+        - assessment_type: Filter by assessment type
+        - start_date: Filter from date
+        - end_date: Filter until date
+        - limit: Number of records (default 20)
+        """
+        try:
+            student = User.objects.get(id=student_id, role=User.STUDENT)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check permission
+        if not self.check_parent_access(request.user, student, 'can_view_grades'):
+            return Response(
+                {'error': 'You do not have permission to view this student\'s grades'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Fetch grades
+        grades = Grade.objects.filter(
+            student=student,
+            is_absent=False
+        ).select_related(
+            'assessment',
+            'assessment__subject',
+            'graded_by'
+        ).order_by('-assessment__date')
+        
+        # Apply filters
+        subject_id = request.query_params.get('subject')
+        assessment_type = request.query_params.get('assessment_type')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        limit = int(request.query_params.get('limit', 20))
+        
+        if subject_id:
+            grades = grades.filter(assessment__subject_id=subject_id)
+        if assessment_type:
+            grades = grades.filter(assessment__assessment_type=assessment_type)
+        if start_date:
+            grades = grades.filter(assessment__date__gte=start_date)
+        if end_date:
+            grades = grades.filter(assessment__date__lte=end_date)
+        
+        # Calculate statistics
+        total_grades = grades.count()
+        avg_percentage = grades.aggregate(avg=Avg('percentage'))['avg']
+        
+        # Paginate
+        grades = grades[:limit]
+        
+        serializer = ChildGradeSerializer(grades, many=True)
+        
+        return Response({
+            'student_id': student.id,
+            'student_name': student.get_full_name(),
+            'total_grades': total_grades,
+            'average_percentage': float(avg_percentage) if avg_percentage else 0,
+            'grades': serializer.data
+        })
+    
+    # ===== Child Attendance =====
+    
+    @action(detail=False, methods=['get'], url_path='child/(?P<student_id>[^/.]+)/attendance')
+    def child_attendance(self, request, student_id=None):
+        """
+        Get attendance records for a specific child.
+        
+        Query parameters:
+        - class_id: Filter by class
+        - start_date: Filter from date
+        - end_date: Filter until date
+        - status: Filter by status (present, absent, late)
+        """
+        try:
+            student = User.objects.get(id=student_id, role=User.STUDENT)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check permission
+        if not self.check_parent_access(request.user, student, 'can_view_attendance'):
+            return Response(
+                {'error': 'You do not have permission to view this student\'s attendance'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Fetch attendance
+        attendance = Attendance.objects.filter(
+            student=student
+        ).select_related('class_assigned', 'recorded_by').order_by('-date')
+        
+        # Apply filters
+        class_id = request.query_params.get('class_id')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        att_status = request.query_params.get('status')
+        
+        if class_id:
+            attendance = attendance.filter(class_assigned_id=class_id)
+        if start_date:
+            attendance = attendance.filter(date__gte=start_date)
+        if end_date:
+            attendance = attendance.filter(date__lte=end_date)
+        if att_status:
+            attendance = attendance.filter(status=att_status)
+        
+        # Calculate statistics
+        total_records = attendance.count()
+        present_count = attendance.filter(status='present').count()
+        absent_count = attendance.filter(status='absent').count()
+        late_count = attendance.filter(status='late').count()
+        
+        attendance_rate = (
+            ((present_count + late_count) / total_records * 100)
+            if total_records > 0 else 0
+        )
+        
+        serializer = ChildAttendanceSerializer(attendance, many=True)
+        
+        return Response({
+            'student_id': student.id,
+            'student_name': student.get_full_name(),
+            'total_records': total_records,
+            'present': present_count,
+            'absent': absent_count,
+            'late': late_count,
+            'attendance_rate': round(attendance_rate, 2),
+            'records': serializer.data
+        })
+    
+    # ===== Child Timetable =====
+    
+    @action(detail=False, methods=['get'], url_path='child/(?P<student_id>[^/.]+)/timetable')
+    def child_timetable(self, request, student_id=None):
+        """
+        Get timetable for a specific child's classes.
+        """
+        try:
+            student = User.objects.get(id=student_id, role=User.STUDENT)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check permission
+        if not self.check_parent_access(request.user, student, 'can_view_timetable'):
+            return Response(
+                {'error': 'You do not have permission to view this student\'s timetable'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get student's classes
+        from academics.models import Class
+        classes = student.classes_joined.all()
+        
+        # Get timetable for these classes
+        timetable = Timetable.objects.filter(
+            class_assigned__in=classes
+        ).select_related('subject', 'teacher', 'class_assigned').order_by('day', 'start_time')
+        
+        # Serialize
+        timetable_data = []
+        for entry in timetable:
+            timetable_data.append({
+                'id': entry.id,
+                'day': entry.get_day_display(),
+                'day_code': entry.day,
+                'start_time': entry.start_time,
+                'end_time': entry.end_time,
+                'subject_name': entry.subject.name,
+                'subject_code': entry.subject.code,
+                'teacher_name': entry.teacher.get_full_name() if entry.teacher else 'TBD',
+                'class_name': entry.class_assigned.name
+            })
+        
+        return Response({
+            'student_id': student.id,
+            'student_name': student.get_full_name(),
+            'total_classes': classes.count(),
+            'timetable_entries': len(timetable_data),
+            'timetable': timetable_data
+        })
+    
+    # ===== Child Performance Summary =====
+    
+    @action(detail=False, methods=['get'], url_path='child/(?P<student_id>[^/.]+)/performance-summary')
+    def child_performance_summary(self, request, student_id=None):
+        """
+        Get comprehensive performance summary for a specific child.
+        Includes grades, attendance, and performance metrics.
+        """
+        try:
+            student = User.objects.get(id=student_id, role=User.STUDENT)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check basic permission (grades or attendance)
+        can_view = (
+            self.check_parent_access(request.user, student, 'can_view_grades') or
+            self.check_parent_access(request.user, student, 'can_view_attendance')
+        )
+        
+        if not can_view:
+            return Response(
+                {'error': 'You do not have permission to view this student\'s data'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Calculate grades stats
+        grades = Grade.objects.filter(
+            student=student,
+            is_absent=False
+        ).aggregate(
+            total=Count('id'),
+            avg_percentage=Avg('percentage')
+        )
+        
+        # Calculate attendance stats
+        attendance = Attendance.objects.filter(
+            student=student
+        ).aggregate(
+            total=Count('id'),
+            present=Count('id', filter=Q(status='present')),
+            absent=Count('id', filter=Q(status='absent'))
+        )
+        
+        attendance_rate = (
+            ((attendance['present'] + Count('id', filter=Q(status='late')))
+             / attendance['total'] * 100)
+            if attendance['total'] > 0 else 0
+        )
+        
+        # Get recent grades
+        recent_grades = Grade.objects.filter(
+            student=student,
+            is_absent=False
+        ).select_related('assessment').order_by('-graded_at')[:5]
+        
+        recent_grades_data = [
+            {
+                'assessment_name': g.assessment.name,
+                'marks': float(g.marks_obtained or 0),
+                'total_marks': float(g.assessment.total_marks),
+                'percentage': float(g.percentage or 0),
+                'grade': g.grade_letter,
+                'date': g.graded_at.date()
+            }
+            for g in recent_grades
+        ]
+        
+        # Determine performance category
+        avg_pct = grades['avg_percentage'] or 0
+        if avg_pct >= 90:
+            category = 'Excellent'
+        elif avg_pct >= 80:
+            category = 'Very Good'
+        elif avg_pct >= 70:
+            category = 'Good'
+        elif avg_pct >= 60:
+            category = 'Satisfactory'
+        else:
+            category = 'Needs Improvement'
+        
+        return Response({
+            'student_id': student.id,
+            'student_name': student.get_full_name(),
+            'overall_percentage': float(grades['avg_percentage'] or 0),
+            'total_assessments': grades['total'],
+            'attendance_rate': round(attendance_rate, 2),
+            'total_attendance': attendance['total'],
+            'present': attendance['present'],
+            'absent': attendance['absent'],
+            'performance_category': category,
+            'recent_grades': recent_grades_data
+        })
  

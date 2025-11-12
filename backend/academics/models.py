@@ -345,3 +345,67 @@ class Grade(models.Model):
                 print(f"Grade letter calculation failed: {e}")
         
         super().save(*args, **kwargs)
+
+class ParentStudentRelationship(models.Model):
+    """Links parents to their student children with permission settings."""
+    
+    RELATIONSHIP_CHOICES = [
+        ('father', 'Father'),
+        ('mother', 'Mother'),
+        ('guardian', 'Guardian'),
+        ('other', 'Other'),
+    ]
+    
+    parent = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        limit_choices_to={'role': User.PARENT},
+        related_name='student_children'
+    )
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        limit_choices_to={'role': User.STUDENT},
+        related_name='parents'
+    )
+    relationship_type = models.CharField(
+        max_length=20,
+        choices=RELATIONSHIP_CHOICES,
+        default='guardian'
+    )
+    is_primary_contact = models.BooleanField(
+        default=False,
+        help_text="Is this the primary contact for the student?"
+    )
+    
+    # Permission settings
+    can_view_grades = models.BooleanField(default=True)
+    can_view_attendance = models.BooleanField(default=True)
+    can_view_timetable = models.BooleanField(default=True)
+    can_receive_notifications = models.BooleanField(default=True)
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('parent', 'student')
+        ordering = ['-is_primary_contact', '-created_at']
+        indexes = [
+            models.Index(fields=['parent', 'student']),
+            models.Index(fields=['parent', 'is_primary_contact']),
+        ]
+    
+    def __str__(self):
+        return f"{self.parent.username} ({self.get_relationship_type_display()}) - {self.student.username}"
+    
+    def save(self, *args, **kwargs):
+        # Ensure parent has parent role
+        if self.parent.role != User.PARENT:
+            raise ValueError("Related user must have parent role")
+        
+        # Ensure student has student role
+        if self.student.role != User.STUDENT:
+            raise ValueError("Related user must have student role")
+        
+        super().save(*args, **kwargs)

@@ -61,6 +61,7 @@ export default function Sidebar() {
     ],
     parent: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/parent-portal", label: "Children Portal", icon: Users },
       { to: "/academics", label: "Child's Classes", icon: BookOpen },
       { to: "/attendance", label: "Child's Attendance", icon: CheckSquare },
       { to: "/updates", label: "School Updates", icon: ClipboardList },

@@ -1,8 +1,11 @@
 # backend/academics/serializers.py - CLEANED (ONLY SERIALIZERS)
 from rest_framework import serializers
-from .models import Class, Subject, Timetable, Attendance, GradeConfig, Assessment, Grade
+from .models import Class, Subject, Timetable, Attendance, GradeConfig, Assessment, Grade, ParentStudentRelationship
 from decimal import Decimal
 from django.db.models import Avg, Count, Sum, Q
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class SubjectSerializer(serializers.ModelSerializer):
     teacher_name = serializers.SerializerMethodField()
@@ -407,3 +410,126 @@ class StudentGradebookSerializer(serializers.Serializer):
     overall_gpa = serializers.DecimalField(max_digits=3, decimal_places=2)
     total_assessments = serializers.IntegerField()
     grades_by_subject = serializers.ListField()
+
+class StudentBasicSerializer(serializers.ModelSerializer):
+    """Basic student info for parent view."""
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'profile_photo']
+    
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        request = self.context.get('request')
+        if instance.profile_photo and request:
+            rep['profile_photo'] = request.build_absolute_uri(instance.profile_photo.url)
+        return rep
+
+
+class ParentStudentRelationshipSerializer(serializers.ModelSerializer):
+    """Serializer for parent-student relationships."""
+    
+    student_name = serializers.SerializerMethodField()
+    student_details = StudentBasicSerializer(source='student', read_only=True)
+    relationship_type_display = serializers.CharField(
+        source='get_relationship_type_display',
+        read_only=True
+    )
+    
+    class Meta:
+        model = ParentStudentRelationship
+        fields = [
+            'id', 'student', 'student_name', 'student_details',
+            'relationship_type', 'relationship_type_display',
+            'is_primary_contact', 'can_view_grades',
+            'can_view_attendance', 'can_view_timetable',
+            'can_receive_notifications', 'created_at'
+        ]
+        read_only_fields = ['created_at', 'student_details']
+    
+    def get_student_name(self, obj):
+        return obj.student.get_full_name() or obj.student.username
+
+
+class ChildPerformanceSummarySerializer(serializers.Serializer):
+    """Summary of child's academic performance."""
+    
+    student_id = serializers.IntegerField()
+    student_name = serializers.CharField()
+    overall_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
+    overall_gpa = serializers.DecimalField(max_digits=3, decimal_places=2)
+    total_assessments = serializers.IntegerField()
+    graded_count = serializers.IntegerField()
+    absent_count = serializers.IntegerField()
+    total_attendance = serializers.IntegerField()
+    present_count = serializers.IntegerField()
+    absent_attendance_count = serializers.IntegerField()
+    attendance_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
+    recent_grades = serializers.ListField()
+    performance_category = serializers.CharField()
+
+
+class ChildGradeSerializer(serializers.ModelSerializer):
+    """Grades for parent view."""
+    
+    assessment_name = serializers.CharField(source='assessment.name', read_only=True)
+    subject_name = serializers.CharField(source='assessment.subject.name', read_only=True)
+    assessment_type = serializers.CharField(source='assessment.assessment_type', read_only=True)
+    total_marks = serializers.DecimalField(
+        source='assessment.total_marks',
+        max_digits=6,
+        decimal_places=2,
+        read_only=True
+    )
+    graded_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Grade
+        fields = [
+            'id', 'assessment', 'assessment_name', 'assessment_type',
+            'subject_name', 'marks_obtained', 'total_marks',
+            'is_absent', 'grade_letter', 'percentage', 'remarks',
+            'graded_by_name', 'graded_at'
+        ]
+        read_only_fields = [
+            'assessment', 'assessment_name', 'assessment_type',
+            'subject_name', 'total_marks', 'grade_letter',
+            'percentage', 'graded_at'
+        ]
+    
+    def get_graded_by_name(self, obj):
+        if obj.graded_by:
+            return obj.graded_by.get_full_name()
+        return None
+
+
+class ChildAttendanceSerializer(serializers.ModelSerializer):
+    """Attendance for parent view."""
+    
+    class_name = serializers.CharField(source='class_assigned.name', read_only=True)
+    recorded_by_name = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = Attendance
+        fields = [
+            'id', 'date', 'status', 'status_display',
+            'class_name', 'recorded_by_name', 'notes', 'created_at'
+        ]
+        read_only_fields = ['date', 'status', 'class_name', 'recorded_by_name']
+    
+    def get_recorded_by_name(self, obj):
+        if obj.recorded_by:
+            return obj.recorded_by.get_full_name()
+        return None
+
+
+class ChildTimetableSerializer(serializers.Serializer):
+    """Timetable view for parent."""
+    
+    day = serializers.CharField()
+    subject_name = serializers.CharField()
+    start_time = serializers.TimeField()
+    end_time = serializers.TimeField()
+    teacher_name = serializers.CharField()
+    class_name = serializers.CharField()

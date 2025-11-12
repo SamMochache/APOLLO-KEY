@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Class, Subject, Timetable, Attendance, GradeConfig, Assessment, Grade
+from .models import Class, Subject, Timetable, Attendance, GradeConfig, Assessment, Grade, ParentStudentRelationship
 
 @admin.register(Class)
 class ClassAdmin(admin.ModelAdmin):
@@ -48,3 +48,52 @@ class GradeAdmin(admin.ModelAdmin):
     list_filter = ("is_absent", "grade_letter", "assessment__assessment_type")
     search_fields = ("student__username", "assessment__name")
     ordering = ("-graded_at",)
+
+@admin.register(ParentStudentRelationship)
+class ParentStudentRelationshipAdmin(admin.ModelAdmin):
+    """Admin interface for managing parent-student relationships."""
+    
+    list_display = (
+        'parent', 'student', 'relationship_type',
+        'is_primary_contact', 'can_view_grades', 'can_view_attendance'
+    )
+    list_filter = (
+        'relationship_type', 'is_primary_contact',
+        'can_view_grades', 'can_view_attendance', 'created_at'
+    )
+    search_fields = (
+        'parent__username', 'parent__email',
+        'student__username', 'student__email'
+    )
+    ordering = ('-is_primary_contact', '-created_at')
+    
+    fieldsets = (
+        ('Relationship', {
+            'fields': ('parent', 'student', 'relationship_type', 'is_primary_contact')
+        }),
+        ('Permissions', {
+            'fields': (
+                'can_view_grades', 'can_view_attendance',
+                'can_view_timetable', 'can_receive_notifications'
+            ),
+            'description': 'Grant or restrict access to specific information'
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ('created_at', 'updated_at')
+    
+    def get_queryset(self, request):
+        """Optimize queryset with select_related."""
+        queryset = super().get_queryset(request)
+        return queryset.select_related('parent', 'student')
+    
+    def get_search_results(self, request, queryset, search_term):
+        """Enhance search to include parent and student names."""
+        queryset, use_distinct = super().get_search_results(
+            request, queryset, search_term
+        )
+        return queryset, use_distinct
