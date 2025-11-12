@@ -140,6 +140,7 @@ class ReportCardGenerator:
             
             # Reset buffer position
             self.buffer.seek(0)
+            self.buffer.flush()
             return self.buffer
             
         except User.DoesNotExist:

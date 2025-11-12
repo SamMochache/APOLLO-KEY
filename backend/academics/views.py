@@ -1179,3 +1179,5 @@ class GradeViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to generate bulk reports: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
+ 
