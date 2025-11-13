@@ -1,4 +1,4 @@
-// frontend/src/api/parentService.js
+// frontend/src/api/parentService.js - FIXED VERSION
 import api from './axios';
 
 const BASE_URL = '/academics/parent';
@@ -6,10 +6,10 @@ const BASE_URL = '/academics/parent';
 class ParentService {
   constructor() {
     this.cache = new Map();
-    this.cacheDuration = 5 * 60 * 1000; // 5 minutes
+    this.cacheDuration = 5 * 60 * 1000;
   }
 
-  // Cache utilities
+  // Cache utilities (keep existing)
   _getCacheKey(endpoint, params = {}) {
     return `${endpoint}?${new URLSearchParams(params).toString()}`;
   }
@@ -42,35 +42,24 @@ class ParentService {
     if (cached) return cached;
 
     try {
+      console.log('🔍 Fetching children from:', `${BASE_URL}/my_children/`);
       const response = await api.get(`${BASE_URL}/my_children/`);
+      console.log('✅ Children data received:', response.data);
       const data = response.data;
       this._setCache(cacheKey, data);
       return data;
     } catch (error) {
-      console.error('Failed to fetch children:', error);
+      console.error('❌ Failed to fetch children:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
       throw new Error(
         error.response?.data?.error ||
+        error.response?.data?.detail ||
         error.message ||
         'Failed to load children'
-      );
-    }
-  }
-
-  async addChild(parentId, studentId, relationshipType = 'guardian') {
-    try {
-      const response = await api.post(`${BASE_URL}/add_child/`, {
-        parent_id: parentId,
-        student_id: studentId,
-        relationship_type: relationshipType
-      });
-      this.clearCache();
-      return response.data;
-    } catch (error) {
-      console.error('Failed to add child:', error);
-      throw new Error(
-        error.response?.data?.error ||
-        error.message ||
-        'Failed to add child'
       );
     }
   }
@@ -89,14 +78,22 @@ class ParentService {
       });
 
       const url = `${BASE_URL}/child/${studentId}/grades/?${params.toString()}`;
+      console.log('🔍 Fetching grades from:', url);
       const response = await api.get(url);
+      console.log('✅ Grades data received:', response.data);
       const data = response.data;
       this._setCache(cacheKey, data);
       return data;
     } catch (error) {
-      console.error('Failed to fetch child grades:', error);
+      console.error('❌ Failed to fetch child grades:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
       throw new Error(
         error.response?.data?.error ||
+        error.response?.data?.detail ||
         error.message ||
         'Failed to load grades'
       );
@@ -117,14 +114,22 @@ class ParentService {
       });
 
       const url = `${BASE_URL}/child/${studentId}/attendance/?${params.toString()}`;
+      console.log('🔍 Fetching attendance from:', url);
       const response = await api.get(url);
+      console.log('✅ Attendance data received:', response.data);
       const data = response.data;
       this._setCache(cacheKey, data);
       return data;
     } catch (error) {
-      console.error('Failed to fetch child attendance:', error);
+      console.error('❌ Failed to fetch child attendance:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
       throw new Error(
         error.response?.data?.error ||
+        error.response?.data?.detail ||
         error.message ||
         'Failed to load attendance'
       );
@@ -139,14 +144,23 @@ class ParentService {
     if (cached) return cached;
 
     try {
-      const response = await api.get(`${BASE_URL}/child/${studentId}/timetable/`);
+      const url = `${BASE_URL}/child/${studentId}/timetable/`;
+      console.log('🔍 Fetching timetable from:', url);
+      const response = await api.get(url);
+      console.log('✅ Timetable data received:', response.data);
       const data = response.data;
       this._setCache(cacheKey, data);
       return data;
     } catch (error) {
-      console.error('Failed to fetch child timetable:', error);
+      console.error('❌ Failed to fetch child timetable:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
       throw new Error(
         error.response?.data?.error ||
+        error.response?.data?.detail ||
         error.message ||
         'Failed to load timetable'
       );
@@ -161,24 +175,30 @@ class ParentService {
     if (cached) return cached;
 
     try {
-      const response = await api.get(
-        `${BASE_URL}/child/${studentId}/performance-summary/`
-      );
+      const url = `${BASE_URL}/child/${studentId}/performance-summary/`;
+      console.log('🔍 Fetching performance summary from:', url);
+      const response = await api.get(url);
+      console.log('✅ Performance summary received:', response.data);
       const data = response.data;
       this._setCache(cacheKey, data);
       return data;
     } catch (error) {
-      console.error('Failed to fetch performance summary:', error);
+      console.error('❌ Failed to fetch performance summary:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
       throw new Error(
         error.response?.data?.error ||
+        error.response?.data?.detail ||
         error.message ||
         'Failed to load performance summary'
       );
     }
   }
 
-  // ===== Utility Methods =====
-
+  // Utility methods (keep existing)
   getPerformanceCategory(percentage) {
     if (percentage >= 90) return { label: 'Excellent', color: 'text-green-600' };
     if (percentage >= 80) return { label: 'Very Good', color: 'text-blue-600' };

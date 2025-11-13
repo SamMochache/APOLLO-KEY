@@ -1300,30 +1300,50 @@ class ParentViewSet(viewsets.ViewSet):
         - end_date: Filter until date
         - limit: Number of records (default 20)
         """
+        # ✅ FIXED: Better error logging
+        print(f"🔍 DEBUG: Fetching grades for student_id={student_id}, parent={request.user.username}")
+        
         try:
             student = User.objects.get(id=student_id, role=User.STUDENT)
+            print(f"✅ Found student: {student.username}")
         except User.DoesNotExist:
+            print(f"❌ Student {student_id} not found")
             return Response(
-                {'error': 'Student not found'},
+                {'error': f'Student with ID {student_id} not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Check permission
-        if not self.check_parent_access(request.user, student, 'can_view_grades'):
+        # ✅ FIXED: Better permission check with detailed logging
+        try:
+            relationship = ParentStudentRelationship.objects.get(
+                parent=request.user,
+                student=student
+            )
+            print(f"✅ Found relationship: {relationship}")
+            
+            if not relationship.can_view_grades:
+                print(f"❌ Permission denied: can_view_grades=False")
+                return Response(
+                    {'error': 'You do not have permission to view this student\'s grades'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except ParentStudentRelationship.DoesNotExist:
+            print(f"❌ No relationship found between {request.user.username} and {student.username}")
             return Response(
-                {'error': 'You do not have permission to view this student\'s grades'},
+                {'error': 'You are not linked to this student'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Fetch grades
+        # ✅ FIXED: Fetch ALL grades (not just non-absent)
         grades = Grade.objects.filter(
-            student=student,
-            is_absent=False
+            student=student
         ).select_related(
             'assessment',
             'assessment__subject',
             'graded_by'
         ).order_by('-assessment__date')
+        
+        print(f"📊 Found {grades.count()} total grades")
         
         # Apply filters
         subject_id = request.query_params.get('subject')
@@ -1341,14 +1361,16 @@ class ParentViewSet(viewsets.ViewSet):
         if end_date:
             grades = grades.filter(assessment__date__lte=end_date)
         
-        # Calculate statistics
+        # Calculate statistics (only non-absent for average)
         total_grades = grades.count()
-        avg_percentage = grades.aggregate(avg=Avg('percentage'))['avg']
+        graded = grades.filter(is_absent=False)
+        avg_percentage = graded.aggregate(avg=Avg('percentage'))['avg']
         
         # Paginate
-        grades = grades[:limit]
+        grades_list = list(grades[:limit])
+        print(f"📤 Returning {len(grades_list)} grades")
         
-        serializer = ChildGradeSerializer(grades, many=True)
+        serializer = ChildGradeSerializer(grades_list, many=True, context={'request': request})
         
         return Response({
             'student_id': student.id,

@@ -1,4 +1,4 @@
-// frontend/src/pages/ParentDashboard.jsx
+// frontend/src/pages/ParentDashboard.jsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect, useContext } from 'react';
 import {
   Users, BookOpen, Calendar, TrendingUp, Award,
@@ -25,7 +25,7 @@ export default function ParentDashboard() {
     fetchChildren();
   }, []);
 
-  // Fetch child data when selected
+  // Fetch child data when selected child or tab changes
   useEffect(() => {
     if (selectedChild) {
       fetchChildData();
@@ -35,13 +35,25 @@ export default function ParentDashboard() {
   const fetchChildren = async () => {
     setLoading(true);
     try {
+      console.log('🔄 Fetching children list...');
       const data = await parentService.getMyChildren();
+      console.log('📋 Children received:', data);
       setChildren(data.children || []);
       
       if (data.children && data.children.length > 0) {
-        setSelectedChild(data.children[0].student_id);
+        const firstChild = data.children[0];
+        console.log('👶 Setting first child:', firstChild);
+        
+        // ✅ FIXED: Use the correct property
+        const studentId = firstChild.student; // This is the correct property based on your data
+        console.log('🎯 Student ID to set:', studentId);
+        
+        setSelectedChild(studentId);
+      } else {
+        console.log('⚠️ No children found');
       }
     } catch (error) {
+      console.error('❌ Error fetching children:', error);
       showMessage('error', error.message);
     } finally {
       setLoading(false);
@@ -49,25 +61,54 @@ export default function ParentDashboard() {
   };
 
   const fetchChildData = async () => {
+    if (!selectedChild) {
+      console.log('⚠️ No child selected, skipping fetch');
+      return;
+    }
+
+    console.log('🎯 fetchChildData called for:', {
+      activeTab,
+      selectedChild,
+      hasChildren: children.length
+    });
+    
     setLoading(true);
     try {
+      console.log(`🔍 Fetching ${activeTab} data for child ID: ${selectedChild}`);
+      
+      // Clear previous data
+      setPerfData(null);
+      setGradesData(null);
+      setAttendanceData(null);
+      setTimetableData(null);
+
       // Fetch based on active tab
       if (activeTab === 'overview') {
+        console.log('📈 Fetching overview...');
         const perf = await parentService.getChildPerformanceSummary(selectedChild);
+        console.log('✅ Performance data:', perf);
         setPerfData(perf);
       } else if (activeTab === 'grades') {
+        console.log('📊 Fetching grades...');
         const grades = await parentService.getChildGrades(selectedChild, { limit: 20 });
+        console.log('✅ Grades data received:', grades);
         setGradesData(grades);
       } else if (activeTab === 'attendance') {
+        console.log('📅 Fetching attendance...');
         const att = await parentService.getChildAttendance(selectedChild);
+        console.log('✅ Attendance data:', att);
         setAttendanceData(att);
       } else if (activeTab === 'timetable') {
+        console.log('📋 Fetching timetable...');
         const tt = await parentService.getChildTimetable(selectedChild);
+        console.log('✅ Timetable data:', tt);
         setTimetableData(tt);
       }
     } catch (error) {
-      showMessage('error', error.message);
+      console.error('❌ Error fetching child data:', error);
+      showMessage('error', error.message || 'Failed to load data');
     } finally {
+      console.log('✅ Loading complete');
       setLoading(false);
     }
   };
@@ -77,7 +118,36 @@ export default function ParentDashboard() {
     setTimeout(() => setMessage({ type: '', text: '' }), 5000);
   };
 
-  const currentChild = children.find(c => c.student_id === selectedChild);
+  const handleTabChange = (tabId) => {
+    console.log('🔄 Changing tab to:', tabId);
+    setActiveTab(tabId);
+  };
+
+  const handleChildChange = (childId) => {
+    console.log('🔄 Changing child to:', childId);
+    setSelectedChild(parseInt(childId));
+    
+    // Clear all data when child changes
+    setPerfData(null);
+    setGradesData(null);
+    setAttendanceData(null);
+    setTimetableData(null);
+  };
+
+  // ✅ FIXED: Use the correct property for currentChild lookup
+  const currentChild = children.find(c => c.student === selectedChild);
+
+  console.log('📊 Current state:', {
+    children: children.length,
+    selectedChild,
+    currentChild,
+    activeTab,
+    loading,
+    hasPerfData: !!perfData,
+    hasGradesData: !!gradesData,
+    hasAttendanceData: !!attendanceData,
+    hasTimetableData: !!timetableData
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -102,7 +172,7 @@ export default function ParentDashboard() {
         </div>
       )}
 
-      {loading && !perfData && !gradesData && !attendanceData ? (
+      {loading && !perfData && !gradesData && !attendanceData && !timetableData ? (
         <div className="text-center py-12">
           <Loader className="w-12 h-12 mx-auto text-blue-600 animate-spin mb-4" />
           <p className="text-gray-600">Loading...</p>
@@ -122,10 +192,13 @@ export default function ParentDashboard() {
               <select
                 className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
                 value={selectedChild || ''}
-                onChange={(e) => setSelectedChild(parseInt(e.target.value))}
+                onChange={(e) => handleChildChange(e.target.value)}
               >
                 {children.map(child => (
-                  <option key={child.student_id} value={child.student_id}>
+                  <option 
+                    key={child.id} 
+                    value={child.student} // ✅ FIXED: Use student property
+                  >
                     {child.student_name}
                   </option>
                 ))}
@@ -136,7 +209,7 @@ export default function ParentDashboard() {
 
           {/* Tabs */}
           <div className="bg-white rounded-xl shadow-md mb-6 border-b">
-            <div className="flex border-b bg-gray-50">
+            <div className="flex border-b bg-gray-50 overflow-x-auto">
               {[
                 { id: 'overview', label: 'Overview', icon: TrendingUp },
                 { id: 'grades', label: 'Grades', icon: Award },
@@ -147,8 +220,8 @@ export default function ParentDashboard() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all ${
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all whitespace-nowrap ${
                       activeTab === tab.id
                         ? 'border-b-3 border-blue-600 text-blue-600 bg-white'
                         : 'text-gray-600 hover:text-blue-600 hover:bg-gray-100'
@@ -164,10 +237,24 @@ export default function ParentDashboard() {
 
           {/* Content */}
           <div className="space-y-6">
+            {loading && (
+              <div className="text-center py-8">
+                <Loader className="w-8 h-8 mx-auto text-blue-600 animate-spin" />
+                <p className="text-gray-600 mt-2">Loading {activeTab} data...</p>
+              </div>
+            )}
+            
             {activeTab === 'overview' && perfData && <OverviewTab data={perfData} />}
             {activeTab === 'grades' && gradesData && <GradesTab data={gradesData} />}
             {activeTab === 'attendance' && attendanceData && <AttendanceTab data={attendanceData} />}
             {activeTab === 'timetable' && timetableData && <TimetableTab data={timetableData} />}
+            
+            {/* Show empty state if no data after loading */}
+            {!loading && activeTab === 'overview' && !perfData && (
+              <div className="text-center py-12 text-gray-500">
+                No overview data available
+              </div>
+            )}
           </div>
         </>
       )}

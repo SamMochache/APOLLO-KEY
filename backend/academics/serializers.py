@@ -469,8 +469,10 @@ class ChildPerformanceSummarySerializer(serializers.Serializer):
     performance_category = serializers.CharField()
 
 
+# Add this to backend/academics/serializers.py
+
 class ChildGradeSerializer(serializers.ModelSerializer):
-    """Grades for parent view."""
+    """Grades for parent view - with better null handling."""
     
     assessment_name = serializers.CharField(source='assessment.name', read_only=True)
     subject_name = serializers.CharField(source='assessment.subject.name', read_only=True)
@@ -501,6 +503,28 @@ class ChildGradeSerializer(serializers.ModelSerializer):
         if obj.graded_by:
             return obj.graded_by.get_full_name()
         return None
+    
+    def to_representation(self, instance):
+        """Enhanced representation with null safety."""
+        rep = super().to_representation(instance)
+        
+        # Handle absent students
+        if instance.is_absent:
+            rep['marks_obtained'] = None
+            rep['percentage'] = None
+            rep['grade_letter'] = 'Absent'
+        
+        # Ensure percentage is always a number or None
+        if rep.get('percentage'):
+            rep['percentage'] = float(rep['percentage'])
+        
+        # Ensure marks are numbers or None
+        if rep.get('marks_obtained'):
+            rep['marks_obtained'] = float(rep['marks_obtained'])
+        if rep.get('total_marks'):
+            rep['total_marks'] = float(rep['total_marks'])
+        
+        return rep
 
 
 class ChildAttendanceSerializer(serializers.ModelSerializer):
