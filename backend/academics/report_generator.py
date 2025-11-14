@@ -14,6 +14,8 @@ from django.db.models import Avg, Sum, Count, Q
 from .models import Grade, Assessment, GradeConfig, User, Class, Subject
 from decimal import Decimal
 import os
+from datetime import datetime
+from .analytics import StudentPerformanceAnalyzer
 
 
 class ReportCardGenerator:
@@ -483,3 +485,124 @@ class ReportCardGenerator:
             
         except Class.DoesNotExist:
             raise ValueError(f"Class with ID {class_id} not found")
+        
+class AnalyticsReportGenerator(ReportCardGenerator):
+    """Extends your existing ReportCardGenerator for analytics reports"""
+    
+    def generate_analytics_report(self, student_id, start_date=None, end_date=None):
+        """Generate PDF analytics report"""
+        try:
+            # Use the analytics engine
+            analyzer = StudentPerformanceAnalyzer(student_id, start_date, end_date)
+            analytics_data = analyzer.get_comprehensive_analytics()
+            student = User.objects.get(id=student_id)
+            
+            # Create PDF document using your existing template
+            doc = SimpleDocTemplate(
+                self.buffer,
+                pagesize=A4,
+                rightMargin=0.75*inch,
+                leftMargin=0.75*inch,
+                topMargin=0.75*inch,
+                bottomMargin=0.75*inch
+            )
+            
+            elements = []
+            
+            # Header (reuse your existing header style)
+            elements.extend(self._build_analytics_header(student, analytics_data))
+            elements.append(Spacer(1, 0.3*inch))
+            
+            # Performance Overview
+            elements.extend(self._build_performance_overview(analytics_data))
+            elements.append(Spacer(1, 0.2*inch))
+            
+            # Grade Trends
+            elements.extend(self._build_grade_trends_section(analytics_data))
+            elements.append(Spacer(1, 0.2*inch))
+            
+            # Subject Analysis
+            elements.extend(self._build_subject_analysis(analytics_data))
+            elements.append(Spacer(1, 0.2*inch))
+            
+            # Recommendations
+            elements.extend(self._build_recommendations(analytics_data))
+            
+            doc.build(elements)
+            self.buffer.seek(0)
+            return self.buffer
+            
+        except Exception as e:
+            raise Exception(f"Error generating analytics report: {str(e)}")
+    
+    def _build_analytics_header(self, student, analytics):
+        """Build analytics report header"""
+        elements = []
+        
+        # School name (reuse your existing style)
+        school_name = Paragraph("APOLLO-KEY ACADEMY", self.styles['SchoolName'])
+        elements.append(school_name)
+        
+        # Report title
+        title = Paragraph("STUDENT PERFORMANCE ANALYTICS REPORT", self.styles['ReportTitle'])
+        elements.append(title)
+        
+        # Student info
+        info_data = [
+            ['Student Name:', student.get_full_name()],
+            ['Report Period:', f"{analytics.get('start_date', 'All time')} to {analytics.get('end_date', 'Present')}"],
+            ['Generated On:', datetime.now().strftime('%Y-%m-%d %H:%M')]
+        ]
+        
+        info_table = Table(info_data, colWidths=[2*inch, 4*inch])
+        info_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        
+        elements.append(info_table)
+        return elements
+    
+    def _build_performance_overview(self, analytics):
+        """Build performance overview section"""
+        elements = []
+        
+        header = Paragraph("Performance Overview", self.styles['SectionHeader'])
+        elements.append(header)
+        
+        perf_metrics = analytics['performance_metrics']
+        overview_data = [
+            ['Metric', 'Value'],
+            ['Overall Average', f"{perf_metrics['average_grade']:.1f}%"],
+            ['Total Assessments', str(perf_metrics['total_assessments'])],
+            ['Performance Trend', analytics['grade_trends']['trend_direction'].title()],
+            ['Consistency Score', f"{analytics['grade_trends']['consistency_score']:.1f}%"]
+        ]
+        
+        overview_table = Table(overview_data, colWidths=[2.5*inch, 3.5*inch])
+        overview_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ]))
+        
+        elements.append(overview_table)
+        return elements
+    
+    # Additional PDF building methods...
+    def _build_grade_trends_section(self, analytics):
+        """Build grade trends section"""
+        # Implementation for trend charts in PDF
+        pass
+    
+    def _build_subject_analysis(self, analytics):
+        """Build subject analysis section"""
+        # Implementation for subject comparison in PDF
+        pass
+    
+    def _build_recommendations(self, analytics):
+        """Build recommendations section"""
+        # Implementation for recommendations in PDF
+        pass

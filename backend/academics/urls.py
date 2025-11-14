@@ -1,5 +1,5 @@
 from rest_framework.routers import DefaultRouter
-from .views import ClassViewSet, SubjectViewSet, TimetableViewSet, AttendanceViewSet, GradeConfigViewSet, AssessmentViewSet, GradeViewSet, ParentViewSet
+from .views import ClassViewSet, SubjectViewSet, TimetableViewSet, AttendanceViewSet, GradeConfigViewSet, AssessmentViewSet, GradeViewSet, ParentViewSet, StudentAnalyticsViewSet
 
 router = DefaultRouter()
 router.register(r"classes", ClassViewSet, basename="class")
@@ -10,5 +10,6 @@ router.register(r"grade-configs", GradeConfigViewSet, basename="grade-config")
 router.register(r"assessments", AssessmentViewSet, basename="assessment")
 router.register(r"grades", GradeViewSet, basename="grade")
 router.register(r"parent", ParentViewSet, basename="parent")
+router.register(r"analytics", StudentAnalyticsViewSet, basename="analytics")
 
 urlpatterns = router.urls

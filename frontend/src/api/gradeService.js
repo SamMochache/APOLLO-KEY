@@ -100,7 +100,7 @@ class GradeAnalyticsService {
   async exportStatistics(filters = {}) {
     try {
       const params = new URLSearchParams(filters);
-      const response = await api.get(`/academics/grades/export-statistics/?${params.toString()}`, {
+      const response = await api.get(`/academics/grades/statistics/?${params.toString()}`, {
         responseType: 'blob'
       });
       

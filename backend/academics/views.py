@@ -16,6 +16,9 @@ from .throttles import UserRateThrottle, BurstRateThrottle, BulkOperationThrottl
 from decimal import Decimal
 from django.http import FileResponse, HttpResponse
 from .report_generator import ReportCardGenerator
+from .analytics import StudentPerformanceAnalyzer
+from .report_generator import AnalyticsReportGenerator
+
 
 
 
@@ -1601,4 +1604,138 @@ class ParentViewSet(viewsets.ViewSet):
             'performance_category': category,
             'recent_grades': recent_grades_data
         })
- 
+    
+class StudentAnalyticsViewSet(viewsets.ViewSet):
+    """Advanced analytics that complements existing GradeViewSet"""
+    
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    
+    def get_queryset(self):
+        """Use existing permission patterns from your GradeViewSet"""
+        user = self.request.user
+        # Reuse your existing role-based filtering logic
+        return Grade.objects.all()
+    
+    @action(detail=False, methods=['get'], url_path='student-performance')
+    def student_performance(self, request):
+        """Comprehensive analytics endpoint"""
+        student_id = request.query_params.get('student_id') or request.user.id
+        
+        # Use your existing permission system
+        if not self._can_access_student_data(request.user, student_id):
+            return Response(
+                {'error': 'Access denied'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        try:
+            analyzer = StudentPerformanceAnalyzer(student_id, start_date, end_date)
+            analytics_data = analyzer.get_comprehensive_analytics()
+            
+            # Add student info (complements your existing user serializers)
+            student = User.objects.get(id=student_id)
+            
+            return Response({
+                'student': {
+                    'id': student.id,
+                    'name': student.get_full_name(),
+                    'email': student.email
+                },
+                'analytics': analytics_data,
+                'generated_at': datetime.now().isoformat(),
+                'cache_info': {
+                    'cached': cache.get(analyzer.cache_key) is not None,
+                    'duration_minutes': 60
+                }
+            })
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Analytics generation failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'], url_path='export-pdf')
+    def export_pdf(self, request):
+        """PDF export functionality - integrates with your report_generator"""
+        student_id = request.query_params.get('student_id') or request.user.id
+        
+        if not self._can_access_student_data(request.user, student_id):
+            return Response({'error': 'Access denied'}, status=403)
+        
+        try:
+            # Use your existing report generator pattern
+            generator = AnalyticsReportGenerator()
+            pdf_buffer = generator.generate_analytics_report(
+                student_id=student_id,
+                start_date=request.query_params.get('start_date'),
+                end_date=request.query_params.get('end_date')
+            )
+            
+            student = User.objects.get(id=student_id)
+            filename = f"analytics_report_{student.username}_{datetime.now().strftime('%Y%m%d')}.pdf"
+            
+            return FileResponse(
+                pdf_buffer,
+                as_attachment=True,
+                filename=filename,
+                content_type='application/pdf'
+            )
+            
+        except Exception as e:
+            return Response(
+                {'error': f'PDF generation failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['post'], url_path='clear-cache')
+    def clear_cache(self, request):
+        """Clear analytics cache - useful for development"""
+        if not request.user.is_staff:
+            return Response({'error': 'Admin access required'}, status=403)
+        
+        student_id = request.data.get('student_id')
+        if student_id:
+            # Clear specific student cache
+            cache_keys = [f"student_analytics_{student_id}_"]
+            for key in cache_keys:
+                cache.delete(key)
+        else:
+            # Clear all analytics cache
+            cache.delete_many(keys=[key for key in cache.keys() if 'student_analytics' in key])
+        
+        return Response({'message': 'Cache cleared successfully'})
+    
+    def _can_access_student_data(self, user, student_id):
+        """Extends your existing permission system from ParentViewSet"""
+        if user.is_superuser or user.role == User.ADMIN:
+            return True
+        
+        if user.role == User.TEACHER:
+            # Teachers can access students in their classes
+            return Class.objects.filter(
+                teacher=user,
+                students=student_id
+            ).exists()
+        
+        if user.role == User.STUDENT:
+            return user.id == int(student_id)
+        
+        if user.role == User.PARENT:
+            # Use your existing parent-student relationship check
+            return ParentStudentRelationship.objects.filter(
+                parent=user, 
+                student_id=student_id,
+                can_view_grades=True
+            ).exists()
+        
+        return False

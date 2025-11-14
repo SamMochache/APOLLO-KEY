@@ -391,13 +391,6 @@ export default function GradeAnalyticsDashboard() {
 
           {/* Export Button */}
           <div className="bg-white rounded-xl shadow-md p-4 flex justify-end">
-            <button
-              onClick={exportReport}
-              className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              <Download className="w-5 h-5" />
-              Export Full Report
-            </button>
             {/* Report Card Generator */}
             <div className="bg-white rounded-xl shadow-md p-6 mb-6">
               <ReportCardGenerator />

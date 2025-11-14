@@ -50,7 +50,7 @@ export default function GradeEntry() {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const res = await api.get(`/academics/assessments/${selectedAssessment}/student-list/`);
+      const res = await api.get(`/academics/assessments/${selectedAssessment}/student_list/`);
       setAssessmentData(res.data.assessment);
       
       const initialGrades = res.data.students.map(student => ({
