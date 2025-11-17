@@ -1,10 +1,10 @@
-// frontend/src/pages/ParentDashboard.jsx - UPDATED WITH NEW COMPONENTS
+// frontend/src/pages/ParentDashboard.jsx - FIXED VERSION
 import React, { useState, useEffect, useContext } from 'react';
 import { TrendingUp, Award, CheckCircle, Calendar, AlertCircle, Loader } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import parentService from '../api/parentService';
 
-// Import new components
+// Import components
 import ChildSelector from '../components/ChildSelector';
 import ChildPerformanceCard from '../components/ChildPerformanceCard';
 import ChildAttendanceCalendar from '../components/ChildAttendanceCalendar';
@@ -13,13 +13,18 @@ import ChildTimetableView from '../components/ChildTimetableView';
 
 export default function ParentDashboard() {
   const { user } = useContext(AuthContext);
+  
+  // ✅ FIX 1: Initialize all state with proper default values
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
   const [loading, setLoading] = useState(false);
+  
+  // ✅ FIX 2: Initialize data states with null (not undefined)
   const [perfData, setPerfData] = useState(null);
   const [attendanceData, setAttendanceData] = useState(null);
   const [gradesData, setGradesData] = useState(null);
   const [timetableData, setTimetableData] = useState(null);
+  
   const [message, setMessage] = useState({ type: '', text: '' });
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -39,13 +44,17 @@ export default function ParentDashboard() {
     setLoading(true);
     try {
       const data = await parentService.getMyChildren();
-      setChildren(data.children || []);
       
-      if (data.children && data.children.length > 0) {
-        setSelectedChild(data.children[0].student);
+      // ✅ FIX 3: Safe array access with fallback
+      const childrenArray = data?.children || [];
+      setChildren(childrenArray);
+      
+      // ✅ FIX 4: Only set selected child if array has items
+      if (childrenArray.length > 0) {
+        setSelectedChild(childrenArray[0].student);
       }
     } catch (error) {
-      showMessage('error', error.message);
+      showMessage('error', error?.message || 'Failed to load children');
     } finally {
       setLoading(false);
     }
@@ -56,7 +65,7 @@ export default function ParentDashboard() {
     
     setLoading(true);
     try {
-      // Clear previous data
+      // ✅ FIX 5: Clear previous data before fetching new
       setPerfData(null);
       setGradesData(null);
       setAttendanceData(null);
@@ -65,19 +74,45 @@ export default function ParentDashboard() {
       // Fetch based on active tab
       if (activeTab === 'overview') {
         const perf = await parentService.getChildPerformanceSummary(selectedChild);
-        setPerfData(perf);
+        // ✅ FIX 6: Validate response before setting
+        setPerfData(perf || null);
       } else if (activeTab === 'grades') {
         const grades = await parentService.getChildGrades(selectedChild, { limit: 50 });
-        setGradesData(grades);
+        // ✅ FIX 7: Ensure grades data has expected structure
+        setGradesData({
+          student_id: grades?.student_id || selectedChild,
+          student_name: grades?.student_name || '',
+          total_grades: grades?.total_grades || 0,
+          average_percentage: grades?.average_percentage || 0,
+          grades: Array.isArray(grades?.grades) ? grades.grades : []
+        });
       } else if (activeTab === 'attendance') {
         const att = await parentService.getChildAttendance(selectedChild);
-        setAttendanceData(att);
+        // ✅ FIX 8: Ensure attendance data has records array
+        setAttendanceData({
+          student_id: att?.student_id || selectedChild,
+          student_name: att?.student_name || '',
+          total_records: att?.total_records || 0,
+          present: att?.present || 0,
+          absent: att?.absent || 0,
+          late: att?.late || 0,
+          attendance_rate: att?.attendance_rate || 0,
+          records: Array.isArray(att?.records) ? att.records : []
+        });
       } else if (activeTab === 'timetable') {
         const tt = await parentService.getChildTimetable(selectedChild);
-        setTimetableData(tt);
+        // ✅ FIX 9: Ensure timetable has array
+        setTimetableData({
+          student_id: tt?.student_id || selectedChild,
+          student_name: tt?.student_name || '',
+          total_classes: tt?.total_classes || 0,
+          timetable_entries: tt?.timetable_entries || 0,
+          timetable: Array.isArray(tt?.timetable) ? tt.timetable : []
+        });
       }
     } catch (error) {
-      showMessage('error', error.message || 'Failed to load data');
+      console.error('Error fetching child data:', error);
+      showMessage('error', error?.message || 'Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -149,7 +184,8 @@ export default function ParentDashboard() {
             loading={false}
           />
 
-          {selectedChild && (
+          {/* ✅ FIX 10: Conditional rendering when child is selected */}
+          {selectedChild ? (
             <>
               {/* Tabs */}
               <div className="bg-white rounded-xl shadow-md mb-6 border-b">
@@ -179,9 +215,11 @@ export default function ParentDashboard() {
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                   <>
+                    {/* ✅ FIX 11: Pass loading state to component */}
                     <ChildPerformanceCard data={perfData} loading={loading} />
                     
-                    {perfData?.recent_grades && perfData.recent_grades.length > 0 && (
+                    {/* ✅ FIX 12: Safe array check before mapping */}
+                    {perfData?.recent_grades && Array.isArray(perfData.recent_grades) && perfData.recent_grades.length > 0 && (
                       <div className="bg-white rounded-xl shadow-md p-6">
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                           <Award className="w-5 h-5 text-blue-600" />
@@ -191,17 +229,18 @@ export default function ParentDashboard() {
                           {perfData.recent_grades.map((grade, idx) => (
                             <div key={idx} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition">
                               <div className="flex-1">
-                                <p className="font-medium">{grade.assessment_name}</p>
+                                <p className="font-medium">{grade?.assessment_name || 'Unknown Assessment'}</p>
                                 <p className="text-xs text-gray-600">
-                                  {new Date(grade.date).toLocaleDateString()}
+                                  {grade?.date ? new Date(grade.date).toLocaleDateString() : 'No date'}
                                 </p>
                               </div>
                               <div className="text-right">
+                                {/* ✅ FIX 13: Safe number access with fallback */}
                                 <p className="text-2xl font-bold text-blue-600">
-                                  {grade.percentage.toFixed(1)}%
+                                  {grade?.percentage ? grade.percentage.toFixed(1) : '0.0'}%
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                  {grade.marks}/{grade.total_marks}
+                                  {grade?.marks || 0}/{grade?.total_marks || 0}
                                 </p>
                               </div>
                             </div>
@@ -214,7 +253,7 @@ export default function ParentDashboard() {
 
                 {/* Grades Tab */}
                 {activeTab === 'grades' && (
-                  <ChildGradesTable data={gradesData} loading={loading} />
+                  <ChildGradesTable gradesData={gradesData} loading={loading} />
                 )}
 
                 {/* Attendance Tab */}
@@ -234,6 +273,12 @@ export default function ParentDashboard() {
                 )}
               </div>
             </>
+          ) : (
+            // ✅ FIX 14: Show message when no child selected
+            <div className="bg-white rounded-xl shadow-md p-12 text-center">
+              <AlertCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <p className="text-gray-500">Please select a child to view their information</p>
+            </div>
           )}
         </>
       )}

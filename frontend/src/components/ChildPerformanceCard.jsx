@@ -1,13 +1,9 @@
-// frontend/src/components/ChildPerformanceCard.jsx
+// frontend/src/components/ChildPerformanceCard.jsx - FIXED VERSION
 import React from 'react';
 import { TrendingUp, Award, Calendar, Target, AlertCircle } from 'lucide-react';
 
-/**
- * Performance summary card for a child
- * @param {Object} data - Performance data from API
- * @param {Boolean} loading - Loading state
- */
 export default function ChildPerformanceCard({ data, loading }) {
+  // Loading state
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -22,6 +18,7 @@ export default function ChildPerformanceCard({ data, loading }) {
     );
   }
 
+  // ✅ FIX 1: No data state
   if (!data) {
     return (
       <div className="bg-gray-50 rounded-xl p-8 text-center text-gray-500 mb-6">
@@ -31,13 +28,43 @@ export default function ChildPerformanceCard({ data, loading }) {
     );
   }
 
-  const perfCategory = getPerformanceCategory(data.overall_percentage);
-  const attCategory = getAttendanceCategory(data.attendance_rate);
+  // ✅ FIX 2: Safe access to all data properties with defaults
+  const overallPercentage = parseFloat(data?.overall_percentage || 0);
+  const attendanceRate = parseFloat(data?.attendance_rate || 0);
+  const totalAssessments = parseInt(data?.total_assessments || 0);
+  const gradedCount = parseInt(data?.graded_count || 0);
+  const presentCount = parseInt(data?.present_count || 0);
+  const totalAttendance = parseInt(data?.total_attendance || 0);
+  const performanceCategory = data?.performance_category || 'N/A';
+
+  // ✅ FIX 3: Helper functions with null safety
+  const getPerformanceCategory = (percentage) => {
+    const pct = parseFloat(percentage);
+    if (isNaN(pct)) return { label: 'N/A', color: 'text-gray-500' };
+    if (pct >= 90) return { label: 'Excellent', color: 'text-green-600' };
+    if (pct >= 80) return { label: 'Very Good', color: 'text-blue-600' };
+    if (pct >= 70) return { label: 'Good', color: 'text-yellow-600' };
+    if (pct >= 60) return { label: 'Satisfactory', color: 'text-orange-600' };
+    return { label: 'Needs Improvement', color: 'text-red-600' };
+  };
+
+  const getPerformanceEmoji = (category) => {
+    const emojis = {
+      'Excellent': '⭐',
+      'Very Good': '✨',
+      'Good': '👍',
+      'Satisfactory': '📚',
+      'Needs Improvement': '💪'
+    };
+    return emojis[category] || '📊';
+  };
+
+  const perfCategory = getPerformanceCategory(overallPercentage);
 
   const cards = [
     {
       title: 'Overall Score',
-      value: `${data.overall_percentage?.toFixed(1) || 0}%`,
+      value: `${overallPercentage.toFixed(1)}%`,
       subtitle: perfCategory.label,
       icon: Target,
       color: 'blue',
@@ -45,24 +72,24 @@ export default function ChildPerformanceCard({ data, loading }) {
     },
     {
       title: 'Attendance Rate',
-      value: `${data.attendance_rate || 0}%`,
-      subtitle: `${data.present || 0}/${data.total_attendance || 0} days`,
+      value: `${attendanceRate.toFixed(1)}%`,
+      subtitle: `${presentCount}/${totalAttendance} days`,
       icon: Calendar,
       color: 'green',
       textColor: 'text-green-600'
     },
     {
       title: 'Assessments',
-      value: data.total_assessments || 0,
-      subtitle: `${data.graded_count || 0} graded`,
+      value: totalAssessments,
+      subtitle: `${gradedCount} graded`,
       icon: Award,
       color: 'purple',
       textColor: 'text-purple-600'
     },
     {
       title: 'Performance',
-      value: getPerformanceEmoji(data.performance_category),
-      subtitle: data.performance_category || 'N/A',
+      value: getPerformanceEmoji(performanceCategory),
+      subtitle: performanceCategory,
       icon: TrendingUp,
       color: 'yellow',
       textColor: 'text-yellow-600'
@@ -93,34 +120,4 @@ export default function ChildPerformanceCard({ data, loading }) {
       })}
     </div>
   );
-}
-
-// Helper functions
-function getPerformanceCategory(percentage) {
-  if (!percentage) return { label: 'N/A', color: 'text-gray-500' };
-  if (percentage >= 90) return { label: 'Excellent', color: 'text-green-600' };
-  if (percentage >= 80) return { label: 'Very Good', color: 'text-blue-600' };
-  if (percentage >= 70) return { label: 'Good', color: 'text-yellow-600' };
-  if (percentage >= 60) return { label: 'Satisfactory', color: 'text-orange-600' };
-  return { label: 'Needs Improvement', color: 'text-red-600' };
-}
-
-function getAttendanceCategory(rate) {
-  if (!rate) return { label: 'N/A', color: 'text-gray-500' };
-  if (rate >= 90) return { label: 'Excellent', color: 'text-green-600' };
-  if (rate >= 80) return { label: 'Good', color: 'text-blue-600' };
-  if (rate >= 70) return { label: 'Average', color: 'text-yellow-600' };
-  if (rate >= 60) return { label: 'Below Average', color: 'text-orange-600' };
-  return { label: 'Poor', color: 'text-red-600' };
-}
-
-function getPerformanceEmoji(category) {
-  const emojis = {
-    'Excellent': '⭐',
-    'Very Good': '✨',
-    'Good': '👍',
-    'Satisfactory': '📚',
-    'Needs Improvement': '💪'
-  };
-  return emojis[category] || '📊';
 }
