@@ -1,4 +1,4 @@
-// frontend/src/pages/StudentAnalytics.jsx
+// frontend/src/pages/StudentAnalytics.jsx - FIXED VERSION
 import React, { useState, useEffect, useContext } from 'react';
 import {
   TrendingUp, BarChart3, Target, Calendar, Download,
@@ -8,7 +8,7 @@ import {
 import { AuthContext } from '../context/AuthContext';
 import { useStudentAnalytics } from '../hooks/useStudentAnalytics';
 
-// Import chart components (kept as you had them)
+// Import chart components
 import GradeTrendChart from '../components/analytics/GradeTrendChart';
 import SubjectRadarChart from '../components/analytics/SubjectRadarChart';
 import AttendanceHeatmap from '../components/analytics/AttendanceHeatmap';
@@ -29,7 +29,7 @@ export default function StudentAnalytics() {
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState({ type: '', text: '' });
 
-  // Custom analytics hook
+  // ✅ FIX 1: Only fetch analytics when selectedStudent changes
   const {
     analytics,
     loading,
@@ -41,10 +41,13 @@ export default function StudentAnalytics() {
     exportPDF,
     hasData,
     isEmpty
-  } = useStudentAnalytics(selectedStudent, {}, true);
+  } = useStudentAnalytics(
+    selectedStudent, 
+    {}, 
+    !!selectedStudent // ✅ Only auto-fetch if student is selected
+  );
 
-  // -- Fetch children for parent users --
-  // Run only when user.role changes to avoid loops.
+  // ✅ FIX 2: Fetch children only once when component mounts for parents
   useEffect(() => {
     if (user?.role !== 'parent') return;
 
@@ -52,7 +55,6 @@ export default function StudentAnalytics() {
     const fetchChildren = async () => {
       try {
         const res = await parentService.getMyChildren();
-        // parentService may return either an array or { children: [...] }
         const list = Array.isArray(res) ? res : res?.children || [];
 
         if (!mounted) return;
@@ -60,13 +62,13 @@ export default function StudentAnalytics() {
 
         // Auto-select first student only if none selected
         if (!selectedStudent && list.length > 0) {
-          // FIX: use child.student (actual student id), not parent-child id
           const first = list[0];
           const studentId = first?.student ?? first?.student_id ?? first?.id ?? null;
-          if (studentId != null) setSelectedStudent(Number(studentId));
+          if (studentId != null) {
+            setSelectedStudent(Number(studentId));
+          }
         }
       } catch (err) {
-        // keep console.error for dev visibility; UI shows error via hook if applicable
         console.error('Failed to fetch children:', err);
       }
     };
@@ -75,8 +77,8 @@ export default function StudentAnalytics() {
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.role]); // only when role changes
+    // ✅ CRITICAL: Empty dependency array - only run once on mount
+  }, []); // ✅ Don't include selectedStudent or user.role here
 
   const handleExportPDF = async () => {
     setExporting(true);
@@ -118,7 +120,7 @@ export default function StudentAnalytics() {
     );
   }
 
-  // Error page (if hook reports error and no data)
+  // Error page
   if (error && !analytics) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
@@ -220,8 +222,6 @@ export default function StudentAnalytics() {
             >
               <option value="">Select a student...</option>
               {(children || []).map((child) => {
-                // Use child.student if present (this is the actual student ID),
-                // fallback to child.student_id or child.id
                 const id = child?.student ?? child?.student_id ?? child?.id;
                 const name = child?.student_full_name
                   ?? child?.student_name

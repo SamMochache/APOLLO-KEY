@@ -1,9 +1,9 @@
+// frontend/src/hooks/useStudentAnalytics.js - FIXED VERSION
 import { useState, useEffect, useCallback, useRef } from 'react';
 import analyticsService from '../api/analyticsService';
 
 /**
- * Custom hook for student analytics with automatic data fetching,
- * caching, and error handling - follows your useGradeAnalytics pattern
+ * Custom hook for student analytics - FIXED to prevent infinite loops
  */
 export function useStudentAnalytics(studentId = null, initialFilters = {}, autoFetch = true) {
   const [analytics, setAnalytics] = useState(null);
@@ -17,6 +17,9 @@ export function useStudentAnalytics(studentId = null, initialFilters = {}, autoF
 
   const abortControllerRef = useRef(null);
   const mountedRef = useRef(true);
+  
+  // ✅ FIX: Track if we've fetched already to prevent re-fetching on every render
+  const hasFetchedRef = useRef(false);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -26,8 +29,13 @@ export function useStudentAnalytics(studentId = null, initialFilters = {}, autoF
     };
   }, []);
 
-  // Fetch analytics data
+  // ✅ FIX: Wrap fetchAnalytics in useCallback to stabilize its reference
   const fetchAnalytics = useCallback(async (customFilters = null) => {
+    if (!studentId) {
+      console.log('⚠️ No student ID provided, skipping fetch');
+      return;
+    }
+
     // Cancel previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -40,10 +48,13 @@ export function useStudentAnalytics(studentId = null, initialFilters = {}, autoF
 
     try {
       const filterData = customFilters || filters;
+      console.log(`📊 Fetching analytics for student ${studentId} with filters:`, filterData);
+      
       const data = await analyticsService.getStudentPerformance(studentId, filterData);
       
       if (mountedRef.current) {
         setAnalytics(data);
+        hasFetchedRef.current = true;
         
         // Show info if no data
         if (!data.analytics || Object.keys(data.analytics).length === 0) {
@@ -55,6 +66,7 @@ export function useStudentAnalytics(studentId = null, initialFilters = {}, autoF
       }
     } catch (err) {
       if (mountedRef.current && err.name !== 'AbortError') {
+        console.error('❌ Analytics fetch error:', err);
         setError({
           type: 'error',
           message: err.message || 'Failed to load analytics'
@@ -66,7 +78,7 @@ export function useStudentAnalytics(studentId = null, initialFilters = {}, autoF
         setLoading(false);
       }
     }
-  }, [studentId, filters]);
+  }, [studentId, filters]); // ✅ Only depend on studentId and filters
 
   // Update filters and optionally refetch
   const updateFilters = useCallback((newFilters, shouldFetch = true) => {
@@ -95,6 +107,7 @@ export function useStudentAnalytics(studentId = null, initialFilters = {}, autoF
   // Refresh data (clear cache and refetch)
   const refresh = useCallback(() => {
     analyticsService.clearCache();
+    hasFetchedRef.current = false;
     fetchAnalytics();
   }, [fetchAnalytics]);
 
@@ -111,14 +124,15 @@ export function useStudentAnalytics(studentId = null, initialFilters = {}, autoF
     }
   }, [studentId, filters]);
 
-  // Auto-fetch on mount if enabled
+  // ✅ FIX: Auto-fetch only once when conditions are met
   useEffect(() => {
-  if (autoFetch && studentId) {
-    console.log(`📊 Fetching analytics for student ID: ${studentId}`);
-    fetchAnalytics();
-  }
-}, [autoFetch, studentId, fetchAnalytics]);
-
+    if (autoFetch && studentId && !hasFetchedRef.current) {
+      console.log(`🚀 Auto-fetching analytics for student ID: ${studentId}`);
+      fetchAnalytics();
+    }
+    // ✅ CRITICAL: Only depend on autoFetch and studentId
+    // Don't include fetchAnalytics because it changes on every render
+  }, [autoFetch, studentId]); // ✅ Removed fetchAnalytics from dependencies
 
   return {
     // Data
