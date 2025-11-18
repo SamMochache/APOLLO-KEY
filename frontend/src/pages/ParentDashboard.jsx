@@ -1,4 +1,4 @@
-// frontend/src/pages/ParentDashboard.jsx - FIXED VERSION
+// frontend/src/pages/ParentDashboard.jsx - FIXED OVERVIEW TAB
 import React, { useState, useEffect, useContext } from 'react';
 import { TrendingUp, Award, CheckCircle, Calendar, AlertCircle, Loader } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
@@ -14,12 +14,10 @@ import ChildTimetableView from '../components/ChildTimetableView';
 export default function ParentDashboard() {
   const { user } = useContext(AuthContext);
   
-  // ✅ FIX 1: Initialize all state with proper default values
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
   const [loading, setLoading] = useState(false);
   
-  // ✅ FIX 2: Initialize data states with null (not undefined)
   const [perfData, setPerfData] = useState(null);
   const [attendanceData, setAttendanceData] = useState(null);
   const [gradesData, setGradesData] = useState(null);
@@ -44,16 +42,14 @@ export default function ParentDashboard() {
     setLoading(true);
     try {
       const data = await parentService.getMyChildren();
-      
-      // ✅ FIX 3: Safe array access with fallback
       const childrenArray = data?.children || [];
       setChildren(childrenArray);
       
-      // ✅ FIX 4: Only set selected child if array has items
       if (childrenArray.length > 0) {
         setSelectedChild(childrenArray[0].student);
       }
     } catch (error) {
+      console.error('❌ Error fetching children:', error);
       showMessage('error', error?.message || 'Failed to load children');
     } finally {
       setLoading(false);
@@ -65,20 +61,45 @@ export default function ParentDashboard() {
     
     setLoading(true);
     try {
-      // ✅ FIX 5: Clear previous data before fetching new
+      // Clear previous data
       setPerfData(null);
       setGradesData(null);
       setAttendanceData(null);
       setTimetableData(null);
 
+      console.log(`🔍 Fetching data for tab: ${activeTab}, child: ${selectedChild}`);
+
       // Fetch based on active tab
       if (activeTab === 'overview') {
+        console.log('📊 Fetching performance summary...');
         const perf = await parentService.getChildPerformanceSummary(selectedChild);
-        // ✅ FIX 6: Validate response before setting
-        setPerfData(perf || null);
+        console.log('✅ Performance data received:', perf);
+        
+        // ✅ FIX: Ensure all required fields exist with defaults
+        const normalizedPerf = {
+          student_id: perf?.student_id || selectedChild,
+          student_name: perf?.student_name || '',
+          overall_percentage: parseFloat(perf?.overall_percentage || 0),
+          overall_gpa: parseFloat(perf?.overall_gpa || 0),
+          total_assessments: parseInt(perf?.total_assessments || 0),
+          graded_count: parseInt(perf?.graded_count || 0),
+          absent_count: parseInt(perf?.absent_count || 0),
+          total_attendance: parseInt(perf?.total_attendance || 0),
+          present_count: parseInt(perf?.present_count || 0),
+          absent_attendance_count: parseInt(perf?.absent_attendance_count || 0),
+          attendance_rate: parseFloat(perf?.attendance_rate || 0),
+          recent_grades: Array.isArray(perf?.recent_grades) ? perf.recent_grades : [],
+          performance_category: perf?.performance_category || 'N/A'
+        };
+        
+        console.log('📦 Normalized performance data:', normalizedPerf);
+        setPerfData(normalizedPerf);
+        
       } else if (activeTab === 'grades') {
+        console.log('📝 Fetching grades...');
         const grades = await parentService.getChildGrades(selectedChild, { limit: 50 });
-        // ✅ FIX 7: Ensure grades data has expected structure
+        console.log('✅ Grades data received:', grades);
+        
         setGradesData({
           student_id: grades?.student_id || selectedChild,
           student_name: grades?.student_name || '',
@@ -86,9 +107,12 @@ export default function ParentDashboard() {
           average_percentage: grades?.average_percentage || 0,
           grades: Array.isArray(grades?.grades) ? grades.grades : []
         });
+        
       } else if (activeTab === 'attendance') {
+        console.log('✅ Fetching attendance...');
         const att = await parentService.getChildAttendance(selectedChild);
-        // ✅ FIX 8: Ensure attendance data has records array
+        console.log('✅ Attendance data received:', att);
+        
         setAttendanceData({
           student_id: att?.student_id || selectedChild,
           student_name: att?.student_name || '',
@@ -99,9 +123,12 @@ export default function ParentDashboard() {
           attendance_rate: att?.attendance_rate || 0,
           records: Array.isArray(att?.records) ? att.records : []
         });
+        
       } else if (activeTab === 'timetable') {
+        console.log('📅 Fetching timetable...');
         const tt = await parentService.getChildTimetable(selectedChild);
-        // ✅ FIX 9: Ensure timetable has array
+        console.log('✅ Timetable data received:', tt);
+        
         setTimetableData({
           student_id: tt?.student_id || selectedChild,
           student_name: tt?.student_name || '',
@@ -110,8 +137,16 @@ export default function ParentDashboard() {
           timetable: Array.isArray(tt?.timetable) ? tt.timetable : []
         });
       }
+      
+      console.log('✅ Data fetch completed successfully');
+      
     } catch (error) {
-      console.error('Error fetching child data:', error);
+      console.error('❌ Error fetching child data:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
+      });
       showMessage('error', error?.message || 'Failed to load data');
     } finally {
       setLoading(false);
@@ -124,10 +159,12 @@ export default function ParentDashboard() {
   };
 
   const handleTabChange = (tabId) => {
+    console.log(`🔄 Changing tab to: ${tabId}`);
     setActiveTab(tabId);
   };
 
   const handleChildChange = (childId) => {
+    console.log(`👤 Changing child to: ${childId}`);
     setSelectedChild(childId);
     
     // Clear all data when child changes
@@ -184,7 +221,6 @@ export default function ParentDashboard() {
             loading={false}
           />
 
-          {/* ✅ FIX 10: Conditional rendering when child is selected */}
           {selectedChild ? (
             <>
               {/* Tabs */}
@@ -215,10 +251,10 @@ export default function ParentDashboard() {
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
                   <>
-                    {/* ✅ FIX 11: Pass loading state to component */}
+                    {/* Performance Card */}
                     <ChildPerformanceCard data={perfData} loading={loading} />
                     
-                    {/* ✅ FIX 12: Safe array check before mapping */}
+                    {/* Recent Assessments */}
                     {perfData?.recent_grades && Array.isArray(perfData.recent_grades) && perfData.recent_grades.length > 0 && (
                       <div className="bg-white rounded-xl shadow-md p-6">
                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
@@ -226,26 +262,39 @@ export default function ParentDashboard() {
                           Recent Assessments
                         </h3>
                         <div className="space-y-3">
-                          {perfData.recent_grades.map((grade, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition">
-                              <div className="flex-1">
-                                <p className="font-medium">{grade?.assessment_name || 'Unknown Assessment'}</p>
-                                <p className="text-xs text-gray-600">
-                                  {grade?.date ? new Date(grade.date).toLocaleDateString() : 'No date'}
-                                </p>
+                          {perfData.recent_grades.map((grade, idx) => {
+                            const percentage = grade?.percentage ? parseFloat(grade.percentage) : 0;
+                            const marks = grade?.marks_obtained || 0;
+                            const totalMarks = grade?.total_marks || 0;
+                            
+                            return (
+                              <div key={idx} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition">
+                                <div className="flex-1">
+                                  <p className="font-medium">{grade?.assessment_name || 'Unknown Assessment'}</p>
+                                  <p className="text-xs text-gray-600">
+                                    {grade?.date ? new Date(grade.date).toLocaleDateString() : 'No date'}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-2xl font-bold text-blue-600">
+                                    {percentage.toFixed(1)}%
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {marks}/{totalMarks}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                {/* ✅ FIX 13: Safe number access with fallback */}
-                                <p className="text-2xl font-bold text-blue-600">
-                                  {grade?.percentage ? grade.percentage.toFixed(1) : '0.0'}%
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {grade?.marks || 0}/{grade?.total_marks || 0}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Show message if no recent grades */}
+                    {perfData && (!perfData.recent_grades || perfData.recent_grades.length === 0) && (
+                      <div className="bg-white rounded-xl shadow-md p-12 text-center">
+                        <Award className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                        <p className="text-gray-500">No recent assessments available</p>
                       </div>
                     )}
                   </>
@@ -274,7 +323,6 @@ export default function ParentDashboard() {
               </div>
             </>
           ) : (
-            // ✅ FIX 14: Show message when no child selected
             <div className="bg-white rounded-xl shadow-md p-12 text-center">
               <AlertCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
               <p className="text-gray-500">Please select a child to view their information</p>

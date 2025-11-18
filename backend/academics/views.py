@@ -1513,92 +1513,173 @@ class ParentViewSet(viewsets.ViewSet):
         """
         Get comprehensive performance summary for a specific child.
         Includes grades, attendance, and performance metrics.
+        
+        URL: /api/academics/parent/child/{student_id}/performance-summary/
         """
-        try:
-            student = User.objects.get(id=student_id, role=User.STUDENT)
-        except User.DoesNotExist:
+        print(f"🔍 Performance Summary Request - Student ID: {student_id}")
+        print(f"👤 Requesting User: {request.user.username} (Role: {request.user.role})")
+        
+        # Validate student_id
+        if not student_id:
+            print("❌ No student_id provided")
             return Response(
-                {'error': 'Student not found'},
-                status=status.HTTP_404_NOT_FOUND
+                {'error': 'student_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Check basic permission (grades or attendance)
-        can_view = (
-            self.check_parent_access(request.user, student, 'can_view_grades') or
-            self.check_parent_access(request.user, student, 'can_view_attendance')
-        )
-        
-        if not can_view:
+        try:
+            student = User.objects.get(id=student_id, role=User.STUDENT)
+            print(f"✅ Found student: {student.username}")
+        except User.DoesNotExist:
+            print(f"❌ Student not found with ID: {student_id}")
             return Response(
-                {'error': 'You do not have permission to view this student\'s data'},
+                {'error': f'Student with ID {student_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except ValueError:
+            print(f"❌ Invalid student_id format: {student_id}")
+            return Response(
+                {'error': 'Invalid student ID format'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check parent-student relationship
+        try:
+            relationship = ParentStudentRelationship.objects.get(
+                parent=request.user,
+                student=student
+            )
+            print(f"✅ Found relationship: {relationship}")
+            
+            # Check permissions
+            can_view = relationship.can_view_grades or relationship.can_view_attendance
+            if not can_view:
+                print(f"❌ Permission denied: No view permissions")
+                return Response(
+                    {'error': 'You do not have permission to view this student\'s data'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except ParentStudentRelationship.DoesNotExist:
+            print(f"❌ No relationship found between parent {request.user.username} and student {student.username}")
+            return Response(
+                {'error': 'You are not linked to this student'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Calculate grades stats
+        print("📊 Calculating performance statistics...")
+        
+        # Calculate grades stats with safe defaults
         grades = Grade.objects.filter(
             student=student,
             is_absent=False
-        ).aggregate(
+        )
+        
+        grades_stats = grades.aggregate(
             total=Count('id'),
             avg_percentage=Avg('percentage')
         )
         
-        # Calculate attendance stats
+        total_assessments = grades_stats['total'] or 0
+        avg_percentage = float(grades_stats['avg_percentage'] or 0)
+        
+        print(f"📝 Grades: {total_assessments} assessments, avg: {avg_percentage}%")
+        
+        # Count absent grades
+        absent_count = Grade.objects.filter(
+            student=student,
+            is_absent=True
+        ).count()
+        
+        # Calculate attendance stats with safe division
         attendance = Attendance.objects.filter(
             student=student
         ).aggregate(
             total=Count('id'),
             present=Count('id', filter=Q(status='present')),
-            absent=Count('id', filter=Q(status='absent'))
+            absent=Count('id', filter=Q(status='absent')),
+            late=Count('id', filter=Q(status='late'))
         )
         
-        attendance_rate = (
-            ((attendance['present'] + Count('id', filter=Q(status='late')))
-             / attendance['total'] * 100)
-            if attendance['total'] > 0 else 0
-        )
+        total_attendance = attendance['total'] or 0
+        present_count = attendance['present'] or 0
+        absent_attendance_count = attendance['absent'] or 0
+        late_count = attendance['late'] or 0
         
-        # Get recent grades
+        # Safe attendance rate calculation
+        if total_attendance > 0:
+            attendance_rate = round(((present_count + late_count) / total_attendance) * 100, 2)
+        else:
+            attendance_rate = 0.0
+        
+        print(f"✅ Attendance: {present_count}/{total_attendance} present, rate: {attendance_rate}%")
+        
+        # Get recent grades safely
         recent_grades = Grade.objects.filter(
             student=student,
             is_absent=False
         ).select_related('assessment').order_by('-graded_at')[:5]
         
-        recent_grades_data = [
-            {
-                'assessment_name': g.assessment.name,
-                'marks': float(g.marks_obtained or 0),
-                'total_marks': float(g.assessment.total_marks),
-                'percentage': float(g.percentage or 0),
-                'grade': g.grade_letter,
-                'date': g.graded_at.date()
-            }
-            for g in recent_grades
-        ]
+        recent_grades_data = []
+        for g in recent_grades:
+            try:
+                recent_grades_data.append({
+                    'assessment_name': g.assessment.name,
+                    'marks_obtained': float(g.marks_obtained or 0),
+                    'total_marks': float(g.assessment.total_marks),
+                    'percentage': float(g.percentage or 0),
+                    'grade_letter': g.grade_letter or 'N/A',
+                    'date': g.graded_at.date().isoformat()
+                })
+            except Exception as e:
+                print(f"⚠️ Error processing grade {g.id}: {e}")
+                continue
         
-        # Determine performance category
-        avg_pct = grades['avg_percentage'] or 0
-        if avg_pct >= 90:
+        print(f"📚 Recent grades: {len(recent_grades_data)} items")
+        
+        # Determine performance category safely
+        if avg_percentage >= 90:
             category = 'Excellent'
-        elif avg_pct >= 80:
+        elif avg_percentage >= 80:
             category = 'Very Good'
-        elif avg_pct >= 70:
+        elif avg_percentage >= 70:
             category = 'Good'
-        elif avg_pct >= 60:
+        elif avg_percentage >= 60:
             category = 'Satisfactory'
         else:
             category = 'Needs Improvement'
         
-        return Response({
+        # Calculate GPA (simple 4.0 scale)
+        if avg_percentage >= 90:
+            gpa = 4.0
+        elif avg_percentage >= 80:
+            gpa = 3.5
+        elif avg_percentage >= 70:
+            gpa = 3.0
+        elif avg_percentage >= 60:
+            gpa = 2.5
+        elif avg_percentage >= 50:
+            gpa = 2.0
+        else:
+            gpa = 1.0
+        
+        response_data = {
             'student_id': student.id,
             'student_name': student.get_full_name(),
-            'overall_percentage': float(grades['avg_percentage'] or 0),
-            'total_assessments': grades['total'],
-            'attendance_rate': round(attendance_rate, 2),
-            'total_attendance': attendance['total'],
-            'present': attendance['present'],
-            'absent': attendance['absent'],
+            'overall_percentage': round(avg_percentage, 2),
+            'overall_gpa': round(gpa, 2),
+            'total_assessments': total_assessments,
+            'graded_count': total_assessments,
+            'absent_count': absent_count,
+            'total_attendance': total_attendance,
+            'present_count': present_count,
+            'absent_attendance_count': absent_attendance_count,
+            'late_count': late_count,
+            'attendance_rate': attendance_rate,
             'performance_category': category,
             'recent_grades': recent_grades_data
-        })
- 
+        }
+        
+        print(f"✅ Successfully generated performance summary")
+        print(f"📦 Response data: {response_data}")
+        
+        return Response(response_data)
