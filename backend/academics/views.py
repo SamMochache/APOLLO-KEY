@@ -3,7 +3,7 @@ from datetime import datetime
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q, Count, Avg
+from django.db.models import Q, Count, Avg, Max, Min
 from .models import Attendance, Class, User, Subject, Timetable, GradeConfig, Assessment, Grade, ParentStudentRelationship
 from .serializers import AttendanceSerializer, ClassSerializer, SubjectSerializer, TimetableSerializer, GradeConfigSerializer, AssessmentSerializer, GradeSerializer, ParentStudentRelationshipSerializer,ChildGradeSerializer,ChildAttendanceSerializer
 from django_filters.rest_framework import DjangoFilterBackend
@@ -16,6 +16,9 @@ from .throttles import UserRateThrottle, BurstRateThrottle, BulkOperationThrottl
 from decimal import Decimal
 from django.http import FileResponse, HttpResponse
 from .report_generator import ReportCardGenerator
+from django.utils import timezone
+import statistics
+from datetime import timedelta
 
 
 
@@ -1683,3 +1686,504 @@ class ParentViewSet(viewsets.ViewSet):
         print(f"📦 Response data: {response_data}")
         
         return Response(response_data)
+
+class StudentAnalyticsViewSet(viewsets.ViewSet):
+    """Advanced analytics for student performance tracking."""
+    
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_permissions_for_student(self, request, student_id):
+        """Check if user can access this student's analytics."""
+        user = request.user
+        
+        # Admin and staff can see all
+        if user.role in [User.ADMIN, User.STAFF]:
+            return True
+        
+        # Students can only see their own
+        if user.role == User.STUDENT:
+            return user.id == int(student_id)
+        
+        # Teachers can see students in their classes
+        if user.role == User.TEACHER:
+            student = User.objects.get(id=student_id)
+            teacher_classes = Class.objects.filter(teacher=user)
+            return student.classes_joined.filter(id__in=teacher_classes).exists()
+        
+        # Parents can see their children
+        if user.role == User.PARENT:
+            from .models import ParentStudentRelationship
+            return ParentStudentRelationship.objects.filter(
+                parent=user,
+                student_id=student_id
+            ).exists()
+        
+        return False
+    
+    @action(detail=False, methods=['get'], url_path='student/(?P<student_id>[^/.]+)')
+    def student_performance(self, request, student_id=None):
+        """
+        Get comprehensive performance analytics for a student.
+        
+        Returns:
+        - Grade trends over time
+        - Subject-wise performance
+        - Attendance correlation
+        - Strengths and weaknesses
+        - Predictions and recommendations
+        """
+        # Permission check
+        if not self.get_permissions_for_student(request, student_id):
+            return Response(
+                {'error': 'You do not have permission to view this student\'s analytics'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Check cache first
+        cache_key = f'student_analytics_{student_id}'
+        cached_data = cache.get(cache_key)
+        if cached_data and not request.query_params.get('refresh'):
+            return Response(cached_data)
+        
+        try:
+            student = User.objects.get(id=student_id, role=User.STUDENT)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Calculate analytics
+        analytics = {
+            'student_id': student.id,
+            'student_name': student.get_full_name(),
+            'grade_trends': self._calculate_grade_trends(student),
+            'subject_performance': self._calculate_subject_performance(student),
+            'attendance_impact': self._calculate_attendance_impact(student),
+            'strengths_weaknesses': self._identify_strengths_weaknesses(student),
+            'predictions': self._generate_predictions(student),
+            'recommendations': self._generate_recommendations(student),
+            'overall_stats': self._calculate_overall_stats(student)
+        }
+        
+        # Cache for 1 hour
+        cache.set(cache_key, analytics, 60 * 60)
+        
+        return Response(analytics)
+    
+    def _calculate_grade_trends(self, student):
+        """Calculate grade trends over time (last 6 months)."""
+        six_months_ago = timezone.now().date() - timedelta(days=180)
+        
+        grades = Grade.objects.filter(
+            student=student,
+            is_absent=False,
+            assessment__date__gte=six_months_ago
+        ).select_related('assessment').order_by('assessment__date')
+        
+        # Group by month
+        monthly_data = {}
+        for grade in grades:
+            month_key = grade.assessment.date.strftime('%Y-%m')
+            if month_key not in monthly_data:
+                monthly_data[month_key] = []
+            monthly_data[month_key].append(float(grade.percentage or 0))
+        
+        # Calculate averages per month
+        trends = []
+        for month, percentages in sorted(monthly_data.items()):
+            trends.append({
+                'month': month,
+                'average': round(sum(percentages) / len(percentages), 2),
+                'assessments_count': len(percentages),
+                'highest': round(max(percentages), 2),
+                'lowest': round(min(percentages), 2)
+            })
+        
+        return trends
+    
+    def _calculate_subject_performance(self, student):
+        """Calculate performance by subject."""
+        grades = Grade.objects.filter(
+            student=student,
+            is_absent=False
+        ).select_related('assessment__subject')
+        
+        subject_data = {}
+        for grade in grades:
+            subject_name = grade.assessment.subject.name
+            if subject_name not in subject_data:
+                subject_data[subject_name] = {
+                    'subject_id': grade.assessment.subject.id,
+                    'percentages': [],
+                    'assessments': 0
+                }
+            subject_data[subject_name]['percentages'].append(float(grade.percentage or 0))
+            subject_data[subject_name]['assessments'] += 1
+        
+        # Calculate statistics per subject
+        performance = []
+        for subject_name, data in subject_data.items():
+            percentages = data['percentages']
+            performance.append({
+                'subject': subject_name,
+                'subject_id': data['subject_id'],
+                'average': round(sum(percentages) / len(percentages), 2),
+                'highest': round(max(percentages), 2),
+                'lowest': round(min(percentages), 2),
+                'consistency': round(100 - statistics.stdev(percentages), 2) if len(percentages) > 1 else 100,
+                'assessments_count': data['assessments']
+            })
+        
+        # Sort by average descending
+        performance.sort(key=lambda x: x['average'], reverse=True)
+        
+        return performance
+    
+    def _calculate_attendance_impact(self, student):
+        """Analyze correlation between attendance and grades."""
+        # Get attendance for last 6 months
+        six_months_ago = timezone.now().date() - timedelta(days=180)
+        
+        attendance_records = Attendance.objects.filter(
+            student=student,
+            date__gte=six_months_ago
+        )
+        
+        total_days = attendance_records.count()
+        present_days = attendance_records.filter(status='present').count()
+        late_days = attendance_records.filter(status='late').count()
+        absent_days = attendance_records.filter(status='absent').count()
+        
+        attendance_rate = ((present_days + late_days) / total_days * 100) if total_days > 0 else 0
+        
+        # Get grades for same period
+        grades = Grade.objects.filter(
+            student=student,
+            is_absent=False,
+            assessment__date__gte=six_months_ago
+        )
+        
+        avg_grade = grades.aggregate(avg=Avg('percentage'))['avg'] or 0
+        
+        # Simple correlation assessment
+        correlation_strength = 'moderate'
+        if attendance_rate >= 90 and avg_grade >= 80:
+            correlation_strength = 'strong_positive'
+        elif attendance_rate < 70 and avg_grade < 60:
+            correlation_strength = 'strong_negative'
+        elif abs(attendance_rate - avg_grade) < 10:
+            correlation_strength = 'moderate'
+        else:
+            correlation_strength = 'weak'
+        
+        return {
+            'total_days': total_days,
+            'present_days': present_days,
+            'late_days': late_days,
+            'absent_days': absent_days,
+            'attendance_rate': round(attendance_rate, 2),
+            'average_grade': round(float(avg_grade), 2),
+            'correlation_strength': correlation_strength,
+            'impact_description': self._get_impact_description(correlation_strength, attendance_rate)
+        }
+    
+    def _get_impact_description(self, strength, attendance_rate):
+        """Generate human-readable impact description."""
+        if strength == 'strong_positive':
+            return "Excellent attendance is positively impacting academic performance"
+        elif strength == 'strong_negative':
+            return "Poor attendance is negatively impacting academic performance"
+        elif attendance_rate < 80:
+            return "Improving attendance could boost academic performance"
+        else:
+            return "Maintaining good attendance supports consistent performance"
+    
+    def _identify_strengths_weaknesses(self, student):
+        """Identify academic strengths and weaknesses."""
+        subject_perf = self._calculate_subject_performance(student)
+        
+        if not subject_perf:
+            return {'strengths': [], 'weaknesses': [], 'improvement_areas': []}
+        
+        avg_performance = sum(s['average'] for s in subject_perf) / len(subject_perf)
+        
+        strengths = [
+            {
+                'subject': s['subject'],
+                'average': s['average'],
+                'reason': 'Consistently high performance'
+            }
+            for s in subject_perf if s['average'] >= avg_performance + 10
+        ][:3]  # Top 3
+        
+        weaknesses = [
+            {
+                'subject': s['subject'],
+                'average': s['average'],
+                'reason': 'Below average performance'
+            }
+            for s in subject_perf if s['average'] < avg_performance - 10
+        ][:3]  # Bottom 3
+        
+        improvement_areas = [
+            {
+                'subject': s['subject'],
+                'current_average': s['average'],
+                'target_average': round(avg_performance, 2),
+                'improvement_needed': round(avg_performance - s['average'], 2)
+            }
+            for s in weaknesses
+        ]
+        
+        return {
+            'strengths': strengths,
+            'weaknesses': weaknesses,
+            'improvement_areas': improvement_areas
+        }
+    
+    def _generate_predictions(self, student):
+        """Generate simple predictions for final grades."""
+        subject_perf = self._calculate_subject_performance(student)
+        trends = self._calculate_grade_trends(student)
+        
+        if not trends or len(trends) < 2:
+            return {
+                'predicted_final_average': None,
+                'confidence': 'low',
+                'note': 'Insufficient data for predictions'
+            }
+        
+        # Simple linear trend prediction
+        recent_avg = sum(t['average'] for t in trends[-3:]) / len(trends[-3:])
+        older_avg = sum(t['average'] for t in trends[:3]) / len(trends[:3])
+        
+        trend_direction = 'improving' if recent_avg > older_avg else 'declining' if recent_avg < older_avg else 'stable'
+        trend_magnitude = abs(recent_avg - older_avg)
+        
+        # Project forward
+        predicted_avg = recent_avg
+        if trend_direction == 'improving':
+            predicted_avg = min(100, recent_avg + (trend_magnitude * 0.5))
+        elif trend_direction == 'declining':
+            predicted_avg = max(0, recent_avg - (trend_magnitude * 0.5))
+        
+        confidence = 'high' if trend_magnitude < 5 else 'medium' if trend_magnitude < 15 else 'low'
+        
+        return {
+            'predicted_final_average': round(predicted_avg, 2),
+            'current_average': round(recent_avg, 2),
+            'trend_direction': trend_direction,
+            'confidence': confidence,
+            'subject_predictions': [
+                {
+                    'subject': s['subject'],
+                    'current': s['average'],
+                    'predicted': round(s['average'], 2)  # Simple: assume continuation
+                }
+                for s in subject_perf[:5]
+            ]
+        }
+    
+    def _generate_recommendations(self, student):
+        """Generate personalized recommendations."""
+        analytics = {
+            'subject_perf': self._calculate_subject_performance(student),
+            'attendance': self._calculate_attendance_impact(student),
+            'strengths_weak': self._identify_strengths_weaknesses(student)
+        }
+        
+        recommendations = []
+        
+        # Attendance recommendation
+        if analytics['attendance']['attendance_rate'] < 80:
+            recommendations.append({
+                'category': 'attendance',
+                'priority': 'high',
+                'title': 'Improve Attendance',
+                'description': f"Current attendance rate is {analytics['attendance']['attendance_rate']:.1f}%. Aim for at least 90% to see better academic results."
+            })
+        
+        # Subject-specific recommendations
+        weaknesses = analytics['strengths_weak']['weaknesses']
+        if weaknesses:
+            for weak in weaknesses[:2]:
+                recommendations.append({
+                    'category': 'academic',
+                    'priority': 'medium',
+                    'title': f"Focus on {weak['subject']}",
+                    'description': f"Current average is {weak['average']:.1f}%. Consider extra practice or tutoring in this subject."
+                })
+        
+        # Consistency recommendation
+        for subj in analytics['subject_perf']:
+            if subj['consistency'] < 70:
+                recommendations.append({
+                    'category': 'consistency',
+                    'priority': 'low',
+                    'title': f"Improve Consistency in {subj['subject']}",
+                    'description': f"Performance varies significantly. Regular study habits can help."
+                })
+                break  # Only one consistency recommendation
+        
+        # Positive reinforcement
+        strengths = analytics['strengths_weak']['strengths']
+        if strengths:
+            recommendations.append({
+                'category': 'strength',
+                'priority': 'positive',
+                'title': f"Keep Up the Great Work!",
+                'description': f"You're excelling in {strengths[0]['subject']}. Consider helping peers or taking advanced topics."
+            })
+        
+        return recommendations
+    
+    def _calculate_overall_stats(self, student):
+        """Calculate overall academic statistics."""
+        grades = Grade.objects.filter(student=student, is_absent=False)
+        
+        if not grades.exists():
+            return {
+                'total_assessments': 0,
+                'overall_average': 0,
+                'gpa': 0,
+                'rank': None
+            }
+        
+        overall_avg = grades.aggregate(avg=Avg('percentage'))['avg'] or 0
+        
+        # Simple GPA calculation (4.0 scale)
+        if overall_avg >= 90:
+            gpa = 4.0
+        elif overall_avg >= 80:
+            gpa = 3.5
+        elif overall_avg >= 70:
+            gpa = 3.0
+        elif overall_avg >= 60:
+            gpa = 2.5
+        elif overall_avg >= 50:
+            gpa = 2.0
+        else:
+            gpa = 1.0
+        
+        return {
+            'total_assessments': grades.count(),
+            'overall_average': round(float(overall_avg), 2),
+            'gpa': round(gpa, 2),
+            'highest_score': round(float(grades.aggregate(max=Max('percentage'))['max'] or 0), 2),
+            'lowest_score': round(float(grades.aggregate(min=Min('percentage'))['min'] or 0), 2)
+        }
+    
+    @action(detail=False, methods=['get'], url_path='class/(?P<class_id>[^/.]+)')
+    def class_analytics(self, request, class_id=None):
+        """Get analytics for entire class."""
+        user = request.user
+        
+        # Permission check
+        if user.role not in [User.ADMIN, User.TEACHER, User.STAFF]:
+            return Response(
+                {'error': 'Only teachers and admins can view class analytics'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            class_obj = Class.objects.get(id=class_id)
+        except Class.DoesNotExist:
+            return Response(
+                {'error': 'Class not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check teacher permission
+        if user.role == User.TEACHER and class_obj.teacher != user:
+            return Response(
+                {'error': 'You can only view analytics for your own classes'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        students = class_obj.students.filter(role=User.STUDENT)
+        
+        class_analytics = {
+            'class_id': class_obj.id,
+            'class_name': class_obj.name,
+            'total_students': students.count(),
+            'average_performance': self._calculate_class_average(students),
+            'top_performers': self._get_top_performers(students, 5),
+            'struggling_students': self._get_struggling_students(students, 5),
+            'subject_averages': self._calculate_class_subject_averages(class_obj)
+        }
+        
+        return Response(class_analytics)
+    
+    def _calculate_class_average(self, students):
+        """Calculate average performance for all students in class."""
+        all_grades = Grade.objects.filter(
+            student__in=students,
+            is_absent=False
+        )
+        
+        avg = all_grades.aggregate(avg=Avg('percentage'))['avg'] or 0
+        return round(float(avg), 2)
+    
+    def _get_top_performers(self, students, limit=5):
+        """Get top performing students."""
+        performers = []
+        for student in students:
+            avg = Grade.objects.filter(
+                student=student,
+                is_absent=False
+            ).aggregate(avg=Avg('percentage'))['avg']
+            
+            if avg:
+                performers.append({
+                    'student_id': student.id,
+                    'student_name': student.get_full_name(),
+                    'average': round(float(avg), 2)
+                })
+        
+        performers.sort(key=lambda x: x['average'], reverse=True)
+        return performers[:limit]
+    
+    def _get_struggling_students(self, students, limit=5):
+        """Get students who need support."""
+        performers = []
+        for student in students:
+            avg = Grade.objects.filter(
+                student=student,
+                is_absent=False
+            ).aggregate(avg=Avg('percentage'))['avg']
+            
+            if avg and avg < 60:  # Below passing threshold
+                performers.append({
+                    'student_id': student.id,
+                    'student_name': student.get_full_name(),
+                    'average': round(float(avg), 2)
+                })
+        
+        performers.sort(key=lambda x: x['average'])
+        return performers[:limit]
+    
+    def _calculate_class_subject_averages(self, class_obj):
+        """Calculate average performance by subject for the class."""
+        grades = Grade.objects.filter(
+            assessment__class_assigned=class_obj,
+            is_absent=False
+        ).select_related('assessment__subject')
+        
+        subject_data = {}
+        for grade in grades:
+            subject_name = grade.assessment.subject.name
+            if subject_name not in subject_data:
+                subject_data[subject_name] = []
+            subject_data[subject_name].append(float(grade.percentage or 0))
+        
+        averages = []
+        for subject, percentages in subject_data.items():
+            averages.append({
+                'subject': subject,
+                'average': round(sum(percentages) / len(percentages), 2),
+                'count': len(percentages)
+            })
+        
+        averages.sort(key=lambda x: x['average'], reverse=True)
+        return averages

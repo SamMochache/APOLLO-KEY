@@ -1,3 +1,4 @@
+// frontend/src/App.jsx - ADD ANALYTICS ROUTE
 import React, { useContext } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
@@ -17,9 +18,10 @@ import TimetableDashboard from "./pages/TimetableDashboard";
 import AttendanceDashboard from "./pages/AttendanceDashboard";
 import AttendanceRecorder from "./pages/AttendanceRecorder";
 import AttendanceRankings from "./pages/AttendanceRankings";  
-import GradeEntry from "./pages/GradeEntry"
+import GradeEntry from "./pages/GradeEntry";
 import GradeAnalytics from "./pages/GradeAnalytics";
 import ParentDashboard from "./pages/ParentDashboard";
+import StudentAnalyticsDashboard from "./pages/StudentAnalyticsDashboard"; // NEW IMPORT
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -34,7 +36,6 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
         
-  
         {/* 🔒 Protected Routes */}
         <Route
           element={
@@ -46,16 +47,17 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
           
-          {/* 📚 Academic Management - Unified Route */}
+          {/* 📚 Academic Management */}
           <Route path="/academics" element={<AdminManagement />} />
           <Route path="/attendance" element={<AttendanceDashboard />} />
           <Route path="/attendance/record" element={<AttendanceRecorder />} />
-          <Route path="/attendance/rankings" element={<AttendanceRankings />} /> {/* NEW ROUTE */}
+          <Route path="/attendance/rankings" element={<AttendanceRankings />} />
           <Route path="/grades/entry" element={<GradeEntry />} />
           <Route path="/grades/analytics" element={<GradeAnalytics />} />
 
+          {/* 📊 NEW: Performance Analytics Route */}
+          <Route path="/analytics/performance" element={<StudentAnalyticsDashboard />} />
 
-  
           {/* 🕓 Timetable Routes */}
           <Route path="/timetable" element={<TimetableDashboard />} />
           <Route path="/timetable/builder" element={<TimetableBuilder />} />

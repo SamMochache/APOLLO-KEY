@@ -1,24 +1,11 @@
-// src/components/Sidebar.jsx - FIXED
+// frontend/src/components/Sidebar.jsx - UPDATED WITH ANALYTICS LINK
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import {
-  LayoutDashboard,
-  Users,
-  BookOpen,
-  Calendar,
-  CalendarCog,
-  ClipboardList,
-  Settings,
-  User,
-  LogOut,
-  CheckSquare,
-  Trophy,
-  TrendingDown,
-  Award,
-  Medal,
-  Edit2,  // ✅ This is already imported - good!
-  TrendingUp,
+  LayoutDashboard, Users, BookOpen, Calendar, CalendarCog,
+  ClipboardList, Settings, User, LogOut, CheckSquare,
+  Trophy, Edit2, TrendingUp, BarChart3, Target
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -36,10 +23,11 @@ export default function Sidebar() {
       { to: "/attendance", label: "Attendance Dashboard", icon: CheckSquare },
       { to: "/attendance/record", label: "Record Attendance", icon: ClipboardList },
       { to: "/attendance/rankings", label: "Attendance Rankings", icon: Trophy },
-      { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },  // ✅ Icon now works
+      { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },
+      { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
+      { to: "/analytics/performance", label: "Performance Analytics", icon: BarChart3 }, // NEW
       { to: "/users", label: "Manage Users", icon: Users },
       { to: "/reports", label: "Reports", icon: ClipboardList },
-      { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
     ],
     teacher: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
@@ -48,31 +36,32 @@ export default function Sidebar() {
       { to: "/timetable/builder", label: "Manage Schedule", icon: CalendarCog },
       { to: "/attendance", label: "Attendance Dashboard", icon: CheckSquare },
       { to: "/attendance/record", label: "Record Attendance", icon: ClipboardList },
-      { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },  // ✅ Icon now works
+      { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },
       { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
+      { to: "/analytics/performance", label: "Performance Analytics", icon: BarChart3 }, // NEW
     ],
     student: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
       { to: "/academics", label: "My Classes", icon: BookOpen },
       { to: "/timetable", label: "My Schedule", icon: Calendar },
       { to: "/attendance", label: "My Attendance", icon: CheckSquare },
+      { to: "/analytics/performance", label: "My Performance", icon: Target }, // NEW
       { to: "/tasks", label: "Assignments", icon: ClipboardList },
-
     ],
     parent: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/parent-portal", label: "Children Portal", icon: Users },
+      { to: "/analytics/performance", label: "Child Performance", icon: BarChart3 }, // NEW
       { to: "/academics", label: "Child's Classes", icon: BookOpen },
       { to: "/attendance", label: "Child's Attendance", icon: CheckSquare },
       { to: "/updates", label: "School Updates", icon: ClipboardList },
-    
     ],
     staff: [
       { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { to: "/academics", label: "Academic Info", icon: BookOpen },
       { to: "/attendance", label: "Attendance Reports", icon: CheckSquare },
+      { to: "/analytics/performance", label: "Performance Reports", icon: BarChart3 }, // NEW
       { to: "/reports", label: "Reports", icon: ClipboardList },
-    
     ],
   };
 
