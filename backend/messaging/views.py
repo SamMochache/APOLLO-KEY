@@ -199,3 +199,4 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         reply = serializer.save(sender=request.user)
         return Response(MessageSerializer(reply, context={'request': request}).data, status=status.HTTP_201_CREATED)
+ 

@@ -14,7 +14,7 @@ router.register(r"subjects", SubjectViewSet, basename="subject")
 router.register(r"timetable", TimetableViewSet, basename="timetable")
 router.register(r"attendance", AttendanceViewSet, basename="attendance")
 router.register(r"grade-configs", GradeConfigViewSet, basename="grade-config")
-router.register(r"assessments", AssessmentViewSet, basename="assessment")
+router.register(r"assessments", AssessmentViewSet, basename="assessments")
 router.register(r"grades", GradeViewSet, basename="grade")
 router.register(r"parent", ParentViewSet, basename="parent")
 

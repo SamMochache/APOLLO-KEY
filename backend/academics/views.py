@@ -646,7 +646,7 @@ class AssessmentViewSet(viewsets.ModelViewSet):
         
         return Response(stats)
     
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], url_path='student-list')
     def student_list(self, request, pk=None):
         """Get list of students for grade entry."""
         assessment = self.get_object()
