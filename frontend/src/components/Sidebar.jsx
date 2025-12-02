@@ -2,6 +2,7 @@
 import React, { useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+
 import {
   LayoutDashboard,
   Users,
@@ -19,6 +20,7 @@ import {
   Medal,
   Edit2,  // ✅ This is already imported - good!
   TrendingUp,
+  Mail,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -41,6 +43,7 @@ export default function Sidebar() {
       { to: "/reports", label: "Reports", icon: ClipboardList },
       { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
       { to: "/analytics/performance", label: "Performance Analytics", icon: TrendingUp },
+      { to: "/messages", label: "Messages", icon: Mail },
     ],
     teacher: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
@@ -52,6 +55,7 @@ export default function Sidebar() {
       { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },  // ✅ Icon now works
       { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
       { to: "/analytics/performance", label: "Student Analytics", icon: TrendingUp },
+      { to: "/messages", label: "Messages", icon: Mail },
     ],
     student: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
@@ -60,6 +64,7 @@ export default function Sidebar() {
       { to: "/attendance", label: "My Attendance", icon: CheckSquare },
       { to: "/tasks", label: "Assignments", icon: ClipboardList },
       { to: "/analytics/performance", label: "My Performance", icon: TrendingUp },
+      { to: "/messages", label: "Messages", icon: Mail },
 
     ],
     parent: [
@@ -69,6 +74,7 @@ export default function Sidebar() {
       { to: "/attendance", label: "Child's Attendance", icon: CheckSquare },
       { to: "/updates", label: "School Updates", icon: ClipboardList },
       { to: "/analytics/performance", label: "Child Analytics", icon: TrendingUp },
+      { to: "/messages", label: "Messages", icon: Mail },
     
     ],
     staff: [
@@ -76,6 +82,7 @@ export default function Sidebar() {
       { to: "/academics", label: "Academic Info", icon: BookOpen },
       { to: "/attendance", label: "Attendance Reports", icon: CheckSquare },
       { to: "/reports", label: "Reports", icon: ClipboardList },
+      { to: "/messages", label: "Messages", icon: Mail },
     
     ],
   };

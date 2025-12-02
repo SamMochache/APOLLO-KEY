@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'users',
     'academics',
     'django_filters',
+    'messaging',
 ]
 
 AUTH_USER_MODEL = 'users.User'

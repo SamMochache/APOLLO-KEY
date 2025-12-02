@@ -21,6 +21,7 @@ import GradeEntry from "./pages/GradeEntry"
 import GradeAnalytics from "./pages/GradeAnalytics";
 import ParentDashboard from "./pages/ParentDashboard";
 import StudentAnalytics from "./pages/StudentAnalytics";
+import MessagesInbox from "./pages/MessagesInbox";
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -55,6 +56,7 @@ function App() {
           <Route path="/grades/entry" element={<GradeEntry />} />
           <Route path="/grades/analytics" element={<GradeAnalytics />} />
           <Route path="/analytics/performance" element={<StudentAnalytics />} />
+          <Route path="/messages" element={<MessagesInbox />} />
 
 
   
