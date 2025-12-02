@@ -20,6 +20,7 @@ import AttendanceRankings from "./pages/AttendanceRankings";
 import GradeEntry from "./pages/GradeEntry"
 import GradeAnalytics from "./pages/GradeAnalytics";
 import ParentDashboard from "./pages/ParentDashboard";
+import StudentAnalytics from "./pages/StudentAnalytics";
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -53,6 +54,7 @@ function App() {
           <Route path="/attendance/rankings" element={<AttendanceRankings />} /> {/* NEW ROUTE */}
           <Route path="/grades/entry" element={<GradeEntry />} />
           <Route path="/grades/analytics" element={<GradeAnalytics />} />
+          <Route path="/analytics/performance" element={<StudentAnalytics />} />
 
 
   

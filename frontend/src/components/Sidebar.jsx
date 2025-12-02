@@ -40,6 +40,7 @@ export default function Sidebar() {
       { to: "/users", label: "Manage Users", icon: Users },
       { to: "/reports", label: "Reports", icon: ClipboardList },
       { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
+      { to: "/analytics/performance", label: "Performance Analytics", icon: TrendingUp },
     ],
     teacher: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
@@ -50,6 +51,7 @@ export default function Sidebar() {
       { to: "/attendance/record", label: "Record Attendance", icon: ClipboardList },
       { to: "/grades/entry", label: "Grade Entry", icon: Edit2 },  // ✅ Icon now works
       { to: "/grades/analytics", label: "Grade Analytics", icon: TrendingUp },
+      { to: "/analytics/performance", label: "Student Analytics", icon: TrendingUp },
     ],
     student: [
       { to: "/dashboard", label: "My Dashboard", icon: LayoutDashboard },
@@ -57,6 +59,7 @@ export default function Sidebar() {
       { to: "/timetable", label: "My Schedule", icon: Calendar },
       { to: "/attendance", label: "My Attendance", icon: CheckSquare },
       { to: "/tasks", label: "Assignments", icon: ClipboardList },
+      { to: "/analytics/performance", label: "My Performance", icon: TrendingUp },
 
     ],
     parent: [
@@ -65,6 +68,7 @@ export default function Sidebar() {
       { to: "/academics", label: "Child's Classes", icon: BookOpen },
       { to: "/attendance", label: "Child's Attendance", icon: CheckSquare },
       { to: "/updates", label: "School Updates", icon: ClipboardList },
+      { to: "/analytics/performance", label: "Child Analytics", icon: TrendingUp },
     
     ],
     staff: [

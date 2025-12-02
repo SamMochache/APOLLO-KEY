@@ -16,6 +16,19 @@ from .throttles import UserRateThrottle, BurstRateThrottle, BulkOperationThrottl
 from decimal import Decimal
 from django.http import FileResponse, HttpResponse
 from .report_generator import ReportCardGenerator
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from .analytics import StudentPerformanceAnalytics
+from django.http import HttpResponse
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from io import BytesIO
+import json
 
 
 
@@ -1683,3 +1696,154 @@ class ParentViewSet(viewsets.ViewSet):
         print(f"📦 Response data: {response_data}")
         
         return Response(response_data)
+
+
+# backend/academics/views.py (ADD THIS)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_performance_analytics(request):
+    """
+    Get comprehensive student performance analytics.
+    
+    Query params:
+    - student_id: Required for teachers/admins, ignored for students (uses request.user)
+    """
+    user = request.user
+    
+    # Get student ID
+    if user.role == 'student':
+        student_id = user.id
+    elif user.role == 'parent':
+        # Parents can view their children's analytics
+        student_id = request.query_params.get('student_id')
+        if not student_id:
+            return Response(
+                {'error': 'student_id is required for parents'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # TODO: Verify parent-student relationship
+    else:
+        # Teachers and admins
+        student_id = request.query_params.get('student_id')
+        if not student_id:
+            return Response(
+                {'error': 'student_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    try:
+        analytics = StudentPerformanceAnalytics(student_id)
+        data = analytics.get_comprehensive_analytics()
+        
+        return Response(data, status=status.HTTP_200_OK)
+    
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'Student not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def export_analytics_pdf(request):
+    """Export analytics to PDF"""
+    user = request.user
+    
+    # Get student ID
+    if user.role == 'student':
+        student_id = user.id
+    else:
+        student_id = request.query_params.get('student_id')
+        if not student_id:
+            return Response(
+                {'error': 'student_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    try:
+        analytics = StudentPerformanceAnalytics(student_id)
+        data = analytics.get_comprehensive_analytics()
+        
+        # Create PDF
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title = Paragraph(
+            f"<b>Performance Analytics: {data['student_info']['name']}</b>",
+            styles['Title']
+        )
+        elements.append(title)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Overall Metrics
+        metrics = data['overall_metrics']
+        elements.append(Paragraph("<b>Overall Performance</b>", styles['Heading2']))
+        metrics_data = [
+            ['Total Assessments', str(metrics['total_assessments'])],
+            ['Average Score', f"{metrics['average_score']}%"],
+            ['GPA', str(metrics['gpa'])],
+            ['Rank Percentile', f"{metrics['rank_percentile']}%"]
+        ]
+        metrics_table = Table(metrics_data, colWidths=[3*inch, 2*inch])
+        metrics_table.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ]))
+        elements.append(metrics_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Strengths and Weaknesses
+        sw = data['strengths_weaknesses']
+        elements.append(Paragraph("<b>Strengths & Weaknesses</b>", styles['Heading2']))
+        
+        if sw['strengths']:
+            elements.append(Paragraph("<b>Strengths:</b>", styles['Normal']))
+            for s in sw['strengths']:
+                elements.append(Paragraph(
+                    f"• {s['subject']}: {s['average']}%",
+                    styles['Normal']
+                ))
+        
+        if sw['weaknesses']:
+            elements.append(Paragraph("<b>Weaknesses:</b>", styles['Normal']))
+            for w in sw['weaknesses']:
+                elements.append(Paragraph(
+                    f"• {w['subject']}: {w['average']}%",
+                    styles['Normal']
+                ))
+        
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Recommendations
+        elements.append(Paragraph("<b>Recommendations</b>", styles['Heading2']))
+        for rec in data['recommendations'][:5]:
+            elements.append(Paragraph(
+                f"• [{rec['priority'].upper()}] {rec['message']}",
+                styles['Normal']
+            ))
+        
+        # Build PDF
+        doc.build(elements)
+        buffer.seek(0)
+        
+        # Return response
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="analytics_{student_id}.pdf"'
+        return response
+    
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
