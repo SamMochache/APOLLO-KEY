@@ -1,121 +1,107 @@
-import React, { useContext } from "react";
+import React, { useContext, Suspense, lazy } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
 import Landing from "./pages/Landing";
 import Unauthorized from "./pages/Unauthorized";
 import DashboardLayout from "./components/DashboardLayout";
 import { AuthContext } from "./context/AuthContext";
 import { ProtectedRoute, RoleProtectedRoute } from "./components/ProtectedRoute";
-import Profile from "./pages/Profile";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import AdminManagement from "./pages/AdminManagement";
-import TimetableBuilder from "./pages/TimetableBuilder";
-import TimetableDashboard from "./pages/TimetableDashboard";
-import AttendanceDashboard from "./pages/AttendanceDashboard";
-import AttendanceRecorder from "./pages/AttendanceRecorder";
-import AttendanceRankings from "./pages/AttendanceRankings";  
-import GradeEntry from "./pages/GradeEntry"
-import GradeAnalytics from "./pages/GradeAnalytics";
-import ParentDashboard from "./pages/ParentDashboard";
-import StudentAnalytics from "./pages/StudentAnalytics";
-import MessagesInbox from "./pages/MessagesInbox";
+
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Profile = lazy(() => import("./pages/Profile"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AdminManagement = lazy(() => import("./pages/AdminManagement"));
+const TimetableBuilder = lazy(() => import("./pages/TimetableBuilder"));
+const TimetableDashboard = lazy(() => import("./pages/TimetableDashboard"));
+const AttendanceDashboard = lazy(() => import("./pages/AttendanceDashboard"));
+const AttendanceRecorder = lazy(() => import("./pages/AttendanceRecorder"));
+const AttendanceRankings = lazy(() => import("./pages/AttendanceRankings"));
+const GradeEntry = lazy(() => import("./pages/GradeEntry"));
+const GradeAnalytics = lazy(() => import("./pages/GradeAnalytics"));
+const ParentDashboard = lazy(() => import("./pages/ParentDashboard"));
+const StudentAnalytics = lazy(() => import("./pages/StudentAnalytics"));
+const MessagesInbox = lazy(() => import("./pages/MessagesInbox"));
 
 function App() {
   const { user } = useContext(AuthContext);
 
   return (
     <Router>
-      <Routes>
-        {/* 🌍 Public Routes */}
-        <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
-        
-  
-        {/* 🔒 Protected Routes */}
-        <Route
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/profile" element={<Profile />} />
-          
-          {/* 📚 Academic Management - Unified Route */}
-          <Route path="/academics" element={<AdminManagement />} />
-          <Route path="/attendance" element={<AttendanceDashboard />} />
-          <Route path="/attendance/record" element={<AttendanceRecorder />} />
-          <Route path="/attendance/rankings" element={<AttendanceRankings />} /> {/* NEW ROUTE */}
-          <Route path="/grades/entry" element={<GradeEntry />} />
-          <Route path="/grades/analytics" element={<GradeAnalytics />} />
-          <Route path="/analytics/performance" element={<StudentAnalytics />} />
-          <Route path="/messages" element={<MessagesInbox />} />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-white">Loading...</div>}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
 
+          <Route
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/academics" element={<AdminManagement />} />
+            <Route path="/attendance" element={<AttendanceDashboard />} />
+            <Route path="/attendance/record" element={<AttendanceRecorder />} />
+            <Route path="/attendance/rankings" element={<AttendanceRankings />} />
+            <Route path="/grades/entry" element={<GradeEntry />} />
+            <Route path="/grades/analytics" element={<GradeAnalytics />} />
+            <Route path="/analytics/performance" element={<StudentAnalytics />} />
+            <Route path="/messages" element={<MessagesInbox />} />
+            <Route path="/timetable" element={<TimetableDashboard />} />
+            <Route path="/timetable/builder" element={<TimetableBuilder />} />
+            <Route
+              path="/admin"
+              element={
+                <RoleProtectedRoute role="admin">
+                  <Dashboard />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="/teacher"
+              element={
+                <RoleProtectedRoute role="teacher">
+                  <Dashboard />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="/student"
+              element={
+                <RoleProtectedRoute role="student">
+                  <Dashboard />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="/parent-portal"
+              element={
+                <RoleProtectedRoute role="parent">
+                  <ParentDashboard />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff"
+              element={
+                <RoleProtectedRoute role="staff">
+                  <Dashboard />
+                </RoleProtectedRoute>
+              }
+            />
+          </Route>
 
-  
-          {/* 🕓 Timetable Routes */}
-          <Route path="/timetable" element={<TimetableDashboard />} />
-          <Route path="/timetable/builder" element={<TimetableBuilder />} />
-
-          {/* 🎯 Role-based Dashboard Routes */}
-          <Route
-            path="/admin"
-            element={
-              <RoleProtectedRoute role="admin">
-                <Dashboard />
-              </RoleProtectedRoute>
-            }
-          />
-          <Route
-            path="/teacher"
-            element={
-              <RoleProtectedRoute role="teacher">
-                <Dashboard />
-              </RoleProtectedRoute>
-            }
-          />
-          <Route
-            path="/student"
-            element={
-              <RoleProtectedRoute role="student">
-                <Dashboard />
-              </RoleProtectedRoute>
-            }
-          />
-          <Route
-            path="/parent-portal"
-            element={
-              <RoleProtectedRoute role="parent">
-                <ParentDashboard />
-              </RoleProtectedRoute>
-            }
-          />
-          <Route
-            path="/staff"
-            element={
-              <RoleProtectedRoute role="staff">
-                <Dashboard />
-              </RoleProtectedRoute>
-            }
-          />
-        </Route>
-
-        {/* 🚫 Unauthorized */}
-        <Route path="/unauthorized" element={<Unauthorized />} />
-
-        {/* 🧭 Catch-all */}
-        <Route
-          path="*"
-          element={<Navigate to={user ? "/dashboard" : "/"} replace />}
-        />
-      </Routes>
+          <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="*" element={<Navigate to={user ? "/dashboard" : "/"} replace />} />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }

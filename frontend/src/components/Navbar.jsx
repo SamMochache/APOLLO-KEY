@@ -1,4 +1,3 @@
-// frontend/src/components/Navbar.jsx - ADD UNREAD COUNTER
 import React, { useContext } from "react";
 import { Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
@@ -8,29 +7,34 @@ export default function Navbar() {
   const { user, logout } = useContext(AuthContext);
 
   return (
-    <nav className="bg-white shadow-md p-4 flex justify-between items-center">
-      <h1 className="text-2xl font-bold text-blue-600">APOLLO-KEY</h1>
+    <header className="bg-[var(--bg-surface)] border-b border-[rgba(255,255,255,0.07)] p-4 flex items-center justify-between gap-4 shadow-[0_1px_0_rgba(255,255,255,0.04)]">
+      <div>
+        <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-3)]">APOLLO·KEY</p>
+        <h1 className="text-xl font-semibold text-[var(--text-1)]">Parent & School Portal</h1>
+      </div>
 
       {user && (
-        <div className="flex items-center space-x-4">
-          {/* Unread Message Counter */}
-          <Link 
-            to="/messages" 
-            className="relative hover:bg-gray-100 p-2 rounded-lg transition"
+        <div className="flex items-center gap-3">
+          <Link
+            to="/messages"
+            className="btn-ghost px-3 py-2 rounded-[var(--radius-sm)] text-[var(--text-2)] hover:text-[var(--text-1)]"
             title="Messages"
           >
             <UnreadMessageCounter />
           </Link>
-          
-          <span className="text-gray-600">👋 {user.username}</span>
+
+          <div className="rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.07)] bg-[var(--bg-surface-2)] px-3 py-2 text-sm text-[var(--text-1)]">
+            👋 {user.username}
+          </div>
+
           <button
             onClick={logout}
-            className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition"
+            className="btn-ghost rounded-[var(--radius-sm)] px-3 py-2 text-[var(--text-2)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-1)]"
           >
             Logout
           </button>
         </div>
       )}
-    </nav>
+    </header>
   );
 }

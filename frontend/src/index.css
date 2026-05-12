@@ -1,14 +1,218 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+:root {
+  --bg-base:      #0a0a0b;
+  --bg-surface:   #111113;
+  --bg-surface-2: #18181b;
+  --bg-surface-3: #1c1c1f;
+  --bg-hover:     rgba(255,255,255,0.04);
 
-  .animate-fadeIn {
-    animation: fadeIn 0.5s ease-out forwards;
-  }
+  --border:       rgba(255,255,255,0.07);
+  --border-hover: rgba(255,255,255,0.13);
+  --border-focus: rgba(99,102,241,0.5);
+
+  --text-1:  #f4f4f5;
+  --text-2:  #a1a1aa;
+  --text-3:  #71717a;
+
+  --accent:      #6366f1;
+  --accent-dim:  rgba(99,102,241,0.15);
+  --accent-text: #818cf8;
+
+  --success: #22d3ee;
+  --warn:    #f59e0b;
+  --danger:  #f87171;
+  --gold:    #e6c97a;
+
+  --radius:    10px;
+  --radius-sm:  6px;
+  --radius-lg: 14px;
+
+  --font: 'Inter', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg-base);
+  color: var(--text-1);
+  font-family: var(--font);
+  font-feature-settings: "cv02","cv03","cv04","cv11";
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(99,102,241,0.25);
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 4px;
+}
+
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 150ms ease;
+}
+
+.card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.surface {
+  background: var(--bg-surface);
+}
+
+.surface-2 {
+  background: var(--bg-surface-2);
+}
+
+.surface-3 {
+  background: var(--bg-surface-3);
+}
+
+.input-field {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+  height: 36px;
+  padding: 0 12px;
+  outline: none;
+  transition: all 150ms ease;
+}
+
+.input-field:focus {
+  border-color: var(--border-focus);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.btn-primary:hover {
+  opacity: 0.95;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  border-radius: var(--radius-sm);
+  height: 34px;
+  padding: 0 14px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.btn-ghost:hover {
+  border-color: var(--border-hover);
+  color: var(--text-1);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.badge-success {
+  background: rgba(34,211,238,0.12);
+  color: var(--success);
+}
+
+.badge-warn {
+  background: rgba(245,158,11,0.12);
+  color: var(--warn);
+}
+
+.badge-danger {
+  background: rgba(248,113,113,0.12);
+  color: var(--danger);
+}
+
+.badge-gold {
+  background: rgba(230,201,122,0.16);
+  color: var(--gold);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+}
+
+.table thead {
+  background: var(--bg-surface-2);
+}
+
+.table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.page-fade {
+  opacity: 0;
+  animation: fadeIn 200ms ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
