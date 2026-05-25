@@ -76,6 +76,11 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": False,
 }
 
+# AI Configuration
+ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
+AI_CACHE_TIMEOUT = int(os.getenv('AI_CACHE_TIMEOUT', 600))
+AI_MAX_TOKENS = int(os.getenv('AI_MAX_TOKENS', 800))
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # must be high in the middleware chain
     'django.middleware.security.SecurityMiddleware',
