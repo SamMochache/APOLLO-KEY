@@ -1,56 +1,175 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg-base:      #0a0a0b;
-  --bg-surface:   #111113;
-  --bg-surface-2: #18181b;
-  --bg-surface-3: #1c1c1f;
-  --bg-hover:     rgba(255,255,255,0.04);
-
-  --border:       rgba(255,255,255,0.07);
-  --border-hover: rgba(255,255,255,0.13);
-  --border-focus: rgba(99,102,241,0.5);
-
-  --text-1:  #f4f4f5;
-  --text-2:  #a1a1aa;
-  --text-3:  #71717a;
-
-  --accent:      #6366f1;
-  --accent-dim:  rgba(99,102,241,0.15);
-  --accent-text: #818cf8;
-
-  --success: #22d3ee;
-  --warn:    #f59e0b;
-  --danger:  #f87171;
-  --gold:    #e6c97a;
-
-  --radius:    10px;
-  --radius-sm:  6px;
-  --radius-lg: 14px;
-
-  --font: 'Inter', system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-}
-
+/* Base Styles */
 html {
-  color-scheme: dark;
   scroll-behavior: smooth;
 }
 
 body {
-  margin: 0;
-  min-height: 100vh;
-  background: var(--bg-base);
-  color: var(--text-1);
-  font-family: var(--font);
-  font-feature-settings: "cv02","cv03","cv04","cv11";
-  font-size: 14px;
-  line-height: 1.6;
+  @apply bg-white text-gray-900 font-sans;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  @apply w-2 h-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded hover:bg-gray-500;
+}
+
+/* Selection */
+::selection {
+  @apply bg-primary-200 text-primary-900;
+}
+
+/* Focus Visible */
+:focus-visible {
+  @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+}
+
+/* Smooth Transitions */
+* {
+  @apply transition-colors duration-200;
+}
+
+/* Link Defaults */
+a {
+  @apply text-primary-600 hover:text-primary-700 transition-colors;
+}
+
+/* Button Reset */
+button {
+  @apply cursor-pointer transition-all duration-200;
+}
+
+/* Form Elements */
+input,
+textarea,
+select {
+  @apply transition-all duration-200;
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+/* Code Blocks */
+code {
+  @apply bg-gray-100 text-gray-800 px-2 py-1 rounded font-mono text-sm;
+}
+
+pre {
+  @apply bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto;
+}
+
+pre code {
+  @apply bg-transparent text-current p-0;
+}
+
+/* Tables */
+table {
+  @apply w-full border-collapse;
+}
+
+th {
+  @apply font-semibold text-left bg-gray-50 border-b border-gray-200 px-4 py-3;
+}
+
+td {
+  @apply border-b border-gray-200 px-4 py-3;
+}
+
+/* Lists */
+ul, ol {
+  @apply list-inside ml-4;
+}
+
+li {
+  @apply mb-2;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  @apply font-bold mb-4;
+}
+
+h1 {
+  @apply text-4xl;
+}
+
+h2 {
+  @apply text-3xl;
+}
+
+h3 {
+  @apply text-2xl;
+}
+
+h4 {
+  @apply text-xl;
+}
+
+/* Utility Classes */
+.container-base {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.truncate-lines {
+  @apply line-clamp-2;
+}
+
+.truncate-lines-3 {
+  @apply line-clamp-3;
+}
+
+.gradient-text {
+  @apply bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent;
+}
+
+.shadow-lg-soft {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
+}
+
+/* Animation Classes */
+@keyframes fadeIn {
+  from {
+    @apply opacity-0;
+  }
+  to {
+    @apply opacity-100;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    @apply opacity-0 translate-y-4;
+  }
+  to {
+    @apply opacity-100 translate-y-0;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    @apply opacity-0 -translate-y-4;
+  }
+  to {
+    @apply opacity-100 translate-y-0;
+  }
+}
+
 
 * {
   box-sizing: border-box;
