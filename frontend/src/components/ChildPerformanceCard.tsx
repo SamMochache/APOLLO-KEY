@@ -1,9 +1,12 @@
-// frontend/src/components/ChildPerformanceCard.jsx - FIXED VERSION
 import React from 'react';
 import { TrendingUp, Award, Calendar, Target, AlertCircle } from 'lucide-react';
 
-export default function ChildPerformanceCard({ data, loading }) {
-  // Loading state
+interface Props {
+  data?: any;
+  loading?: boolean;
+}
+
+export default function ChildPerformanceCard({ data, loading }: Props) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -18,7 +21,6 @@ export default function ChildPerformanceCard({ data, loading }) {
     );
   }
 
-  // ✅ FIX 1: No data state
   if (!data) {
     return (
       <div className="bg-gray-50 rounded-xl p-8 text-center text-gray-500 mb-6">
@@ -28,7 +30,6 @@ export default function ChildPerformanceCard({ data, loading }) {
     );
   }
 
-  // ✅ FIX 2: Safe access to all data properties with defaults
   const overallPercentage = parseFloat(data?.overall_percentage || 0);
   const attendanceRate = parseFloat(data?.attendance_rate || 0);
   const totalAssessments = parseInt(data?.total_assessments || 0);
@@ -37,9 +38,8 @@ export default function ChildPerformanceCard({ data, loading }) {
   const totalAttendance = parseInt(data?.total_attendance || 0);
   const performanceCategory = data?.performance_category || 'N/A';
 
-  // ✅ FIX 3: Helper functions with null safety
-  const getPerformanceCategory = (percentage) => {
-    const pct = parseFloat(percentage);
+  const getPerformanceCategory = (percentage: number) => {
+    const pct = Number(percentage);
     if (isNaN(pct)) return { label: 'N/A', color: 'text-gray-500' };
     if (pct >= 90) return { label: 'Excellent', color: 'text-green-600' };
     if (pct >= 80) return { label: 'Very Good', color: 'text-blue-600' };
@@ -48,8 +48,8 @@ export default function ChildPerformanceCard({ data, loading }) {
     return { label: 'Needs Improvement', color: 'text-red-600' };
   };
 
-  const getPerformanceEmoji = (category) => {
-    const emojis = {
+  const getPerformanceEmoji = (category: string) => {
+    const emojis: Record<string, string> = {
       'Excellent': '⭐',
       'Very Good': '✨',
       'Good': '👍',
@@ -99,7 +99,7 @@ export default function ChildPerformanceCard({ data, loading }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       {cards.map((card, index) => {
-        const Icon = card.icon;
+        const Icon = card.icon as any;
         return (
           <div 
             key={index}

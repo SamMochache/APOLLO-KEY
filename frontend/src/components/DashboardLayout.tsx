@@ -1,10 +1,9 @@
-// src/components/DashboardLayout.jsx
-import React from "react";
-import Navbar from "./Navbar";
-import Sidebar from "./Sidebar";
-import { Outlet } from "react-router-dom";
+import React from 'react';
+import Navbar from './Navbar';
+import Sidebar from './Sidebar';
+import { Outlet } from 'react-router-dom';
 
-export default function DashboardLayout() {
+export default function DashboardLayout(): React.ReactElement {
   return (
     <div className="flex min-h-screen bg-gray-100">
       <Sidebar />

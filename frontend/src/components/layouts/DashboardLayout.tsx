@@ -5,8 +5,8 @@
 
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Navbar } from './Navbar';
-import { Sidebar } from './Sidebar';
+import { Navbar } from '../common/Navbar';
+import { Sidebar } from '../common/Sidebar';
 
 export const DashboardLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);

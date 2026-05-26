@@ -87,6 +87,26 @@ export interface Message {
   updated_at: string;
 }
 
+export interface Recipient {
+  id: number;
+  name: string;
+  email?: string;
+}
+
+export interface Thread {
+  id: number;
+  subject?: string;
+  participants?: Recipient[];
+  messages: Message[];
+}
+
+export interface AttendanceSummary {
+  present: number;
+  absent: number;
+  attendance_rate: number;
+  [key: string]: any;
+}
+
 export interface Notification {
   id: string;
   type: 'success' | 'error' | 'warning' | 'info';

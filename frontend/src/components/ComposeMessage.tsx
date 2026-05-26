@@ -1,12 +1,17 @@
-// frontend/src/components/ComposeMessage.jsx
 import React, { useState, useEffect } from 'react';
 import { X, Send, AlertCircle, Loader } from 'lucide-react';
-import messagingService from '../api/messagingService';
+import * as messagingService from '../api/messagingService';
 
-export default function ComposeMessage({ onClose, onSuccess, replyTo = null }) {
-  const [recipients, setRecipients] = useState([]);
-  const [formData, setFormData] = useState({
-    recipient: replyTo?.sender.id || '',
+interface Props {
+  onClose: () => void;
+  onSuccess: () => void;
+  replyTo?: any | null;
+}
+
+export default function ComposeMessage({ onClose, onSuccess, replyTo = null }: Props) {
+  const [recipients, setRecipients] = useState<any[]>([]);
+  const [formData, setFormData] = useState<any>({
+    recipient: replyTo?.sender?.id || '',
     related_student: replyTo?.related_student?.id || '',
     subject: replyTo ? `Re: ${replyTo.subject}` : '',
     body: '',
@@ -28,7 +33,7 @@ export default function ComposeMessage({ onClose, onSuccess, replyTo = null }) {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -40,15 +45,15 @@ export default function ComposeMessage({ onClose, onSuccess, replyTo = null }) {
         await messagingService.sendMessage(formData);
       }
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       setError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleChange = (field: string, value: any) => {
+    setFormData((prev: any) => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -90,7 +95,7 @@ export default function ComposeMessage({ onClose, onSuccess, replyTo = null }) {
               className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- Select recipient --</option>
-              {recipients.map(recipient => (
+              {recipients.map((recipient: any) => (
                 <option key={recipient.id} value={recipient.id}>
                   {recipient.full_name} ({recipient.role}) - {recipient.email}
                 </option>
@@ -110,8 +115,8 @@ export default function ComposeMessage({ onClose, onSuccess, replyTo = null }) {
             >
               <option value="">-- None --</option>
               {recipients
-                .filter(r => r.related_student)
-                .map(recipient => (
+                .filter((r: any) => r.related_student)
+                .map((recipient: any) => (
                   <option key={recipient.related_student.id} value={recipient.related_student.id}>
                     {recipient.related_student.name}
                   </option>
@@ -158,7 +163,7 @@ export default function ComposeMessage({ onClose, onSuccess, replyTo = null }) {
               value={formData.body}
               onChange={(e) => handleChange('body', e.target.value)}
               required
-              rows="8"
+              rows={8}
               placeholder="Write your message here..."
               className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
             />
@@ -196,4 +201,3 @@ export default function ComposeMessage({ onClose, onSuccess, replyTo = null }) {
     </div>
   );
 }
-

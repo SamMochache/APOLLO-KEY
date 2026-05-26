@@ -1,10 +1,10 @@
-import React, { useContext } from "react";
-import { Link } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
-import UnreadMessageCounter from "./UnreadMessageCounter";
+import React, { useContext } from 'react';
+import { Link } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import UnreadMessageCounter from './UnreadMessageCounter';
 
-export default function Navbar() {
-  const { user, logout } = useContext(AuthContext);
+export default function Navbar(): React.ReactElement {
+  const { user, logout } = useContext<any>(AuthContext);
 
   return (
     <header className="bg-[var(--bg-surface)] border-b border-[rgba(255,255,255,0.07)] p-4 flex items-center justify-between gap-4 shadow-[0_1px_0_rgba(255,255,255,0.04)]">

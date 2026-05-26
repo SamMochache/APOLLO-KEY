@@ -8,7 +8,7 @@ import {
   TrendingUp, Award, AlertCircle, Download, Filter,
   Users, BookOpen, Target, RefreshCw
 } from 'lucide-react';
-import gradeAnalyticsService from '../api/gradeService';
+import gradeAnalyticsService from '../api/gradeAnalyticsService';
 import ReportCardGenerator from '../pages/ReportCardGenerator';
 
 export default function GradeAnalyticsDashboard() {

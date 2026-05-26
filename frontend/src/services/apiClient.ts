@@ -85,6 +85,17 @@ class ApiClient {
     return this.client.post<T>(url, data, config);
   }
 
+  // Convenience helpers that return the response data directly
+  async getData<T>(url: string, config?: any): Promise<T> {
+    const res = await this.client.get<T>(url, config);
+    return res.data;
+  }
+
+  async postData<T>(url: string, data?: any, config?: any): Promise<T> {
+    const res = await this.client.post<T>(url, data, config);
+    return res.data;
+  }
+
   async put<T>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> {
     return this.client.put<T>(url, data, config);
   }

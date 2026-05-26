@@ -1,23 +1,21 @@
-// frontend/src/components/UnreadMessageCounter.jsx
 import React, { useState, useEffect } from 'react';
 import { Mail } from 'lucide-react';
-import messagingService from '../api/messagingService';
+import { getUnreadCount } from '../api/messagingService';
 
 export default function UnreadMessageCounter() {
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   useEffect(() => {
     fetchUnreadCount();
-    
-    // Poll every 30 seconds
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
 
   const fetchUnreadCount = async () => {
     try {
-      const data = await messagingService.getUnreadCount();
-      setUnreadCount(data.unread_count);
+      const data = await getUnreadCount();
+      const count = Number((data as any) || 0);
+      setUnreadCount(isNaN(count) ? 0 : count);
     } catch (error) {
       console.error('Failed to fetch unread count:', error);
     }

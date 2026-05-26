@@ -1,15 +1,23 @@
-// frontend/src/components/ChildSelector.jsx
 import React from 'react';
 import { ChevronDown, User } from 'lucide-react';
 
-/**
- * Reusable component for selecting between multiple children
- * @param {Array} children - List of children with student details
- * @param {Number} selectedChild - Currently selected child ID
- * @param {Function} onChildChange - Callback when child is changed
- * @param {Boolean} loading - Loading state
- */
-export default function ChildSelector({ children, selectedChild, onChildChange, loading }) {
+interface Child {
+  id: number;
+  student: number;
+  student_name: string;
+  relationship_type_display: string;
+  related_student?: { id: number; name: string } | null;
+  is_primary_contact?: boolean;
+}
+
+interface Props {
+  children: Child[];
+  selectedChild: number | null;
+  onChildChange: (id: number) => void;
+  loading?: boolean;
+}
+
+export default function ChildSelector({ children, selectedChild, onChildChange, loading }: Props) {
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-md p-4 mb-6 animate-pulse">
@@ -56,7 +64,6 @@ export default function ChildSelector({ children, selectedChild, onChildChange, 
         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
       </div>
 
-      {/* Selected Child Info */}
       {currentChild && (
         <div className="mt-3 pt-3 border-t border-gray-200">
           <div className="flex items-center justify-between text-sm">
